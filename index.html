@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Ignore benign Vite HMR WebSocket connection errors in AI Studio iframe environment
+      window.addEventListener('error', function (e) {
+        var msg = e && (e.message || (e.error && e.error.message) || '');
+        var file = e && (e.filename || '');
+        if (
+          typeof msg === 'string' && (
+            msg.indexOf('WebSocket') !== -1 ||
+            msg.indexOf('createWebSocketModuleRunnerTransport') !== -1
+          ) ||
+          typeof file === 'string' && file.indexOf('@vite/client') !== -1
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          return true;
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        var reason = e && (e.reason ? (e.reason.message || String(e.reason)) : '');
+        if (
+          typeof reason === 'string' && (
+            reason.indexOf('WebSocket') !== -1 ||
+            reason.indexOf('createWebSocketModuleRunnerTransport') !== -1 ||
+            reason.indexOf('@vite/client') !== -1
+          )
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+    </script>
+    <title>Квант & Код — Платформа репетитора</title>
+    <meta name="description" content="Интерактивная платформа для репетитора по математике, физике и информатике: бронирование слотов, IDE песочница кода с Piston API, банк задач, двухуровневый трекер экзаменов и отчеты для родителей." />
+    <meta property="og:title" content="Квант & Код — Платформа репетитора" />
+    <meta property="og:description" content="Интерактивная платформа для репетитора по математике, физике и информатике: бронирование слотов, IDE песочница кода с Piston API, банк задач, двухуровневый трекер экзаменов и отчеты для родителей." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+  </head>
+  <body class="bg-[#F8F7F4] text-[#1B1B19] font-sans antialiased min-h-screen selection:bg-[#1B1B19] selection:text-[#F8F7F4]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

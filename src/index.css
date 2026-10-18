@@ -1,0 +1,295 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #F8F7F4;
+  --ink: #1B1B19;
+  --accent: #D4AF37;
+  --ink-faint: rgba(27, 27, 25, 0.08);
+  --ink-medium: rgba(27, 27, 25, 0.4);
+  color-scheme: light;
+}
+
+html.dark, .dark {
+  --bg: #0F1117;
+  --ink: #F3F3EE;
+  --accent: #E5C048;
+  --ink-faint: rgba(243, 243, 238, 0.06);
+  --ink-medium: rgba(243, 243, 238, 0.4);
+  color-scheme: dark;
+}
+
+/* Controlled Dark Mode Base Surfaces */
+html.dark body,
+.dark body {
+  background-color: #0F1117;
+  color: #F3F3EE;
+}
+
+.dark .bg-white {
+  background-color: #181A22;
+  color: #F3F3EE;
+}
+
+.dark .bg-\[\#F8F7F4\] {
+  background-color: #12141A;
+}
+
+.dark .border-\[\#1B1B19\],
+.dark .border-\[\#1B1B19\]\/10,
+.dark .border-\[\#1B1B19\]\/15,
+.dark .border-\[\#1B1B19\]\/20,
+.dark .border-\[\#1B1B19\]\/25,
+.dark .border-\[\#1B1B19\]\/30,
+.dark .border-\[\#1B1B19\]\/40 {
+  border-color: #2E3342;
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4 {
+  color: #F3F3EE;
+}
+
+.dark .text-\[\#1B1B19\]:not([class*="bg-amber"]):not([class*="bg-yellow"]):not([class*="bg-[#E5C048]"]) {
+  color: #F3F3EE;
+}
+
+.dark .text-\[\#1B1B19\]\/40,
+.dark .text-\[\#1B1B19\]\/50,
+.dark .text-\[\#1B1B19\]\/60,
+.dark .text-\[\#1B1B19\]\/70 {
+  color: #9CA3AF;
+}
+
+.dark .text-\[\#1B1B19\]\/80,
+.dark .text-\[\#1B1B19\]\/90 {
+  color: #D1D5DB;
+}
+
+.dark button.bg-\[\#1B1B19\] {
+  background-color: #242834;
+  color: #F3F3EE;
+  border-color: #D4AF37;
+}
+
+.dark button.bg-\[\#1B1B19\]:hover {
+  background-color: #2E3444;
+}
+
+.dark button.bg-white {
+  background-color: #181A22;
+  color: #F3F3EE;
+  border-color: #2E3342;
+}
+
+.dark button.bg-white:hover {
+  background-color: #222632;
+  color: #E5C048;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background-color: #12141C;
+  color: #F3F3EE;
+  border-color: #2E3342;
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(var(--ink-faint) 1px, transparent 0);
+    background-size: 32px 32px;
+    background-attachment: fixed;
+  }
+  
+  h1, h2, h3, .font-serif {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+  }
+
+  code, pre, kbd, samp, .font-mono {
+    font-family: 'Space Mono', 'JetBrains Mono', monospace;
+  }
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* Custom Sleek Editorial Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #C8C5BE;
+  border-radius: 2px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #363B47;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink);
+}
+
+/* Editorial Academic Tokens */
+.label-academic {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink);
+  opacity: 0.65;
+}
+
+.marker-academic {
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.card-editorial {
+  border: 1px solid var(--ink);
+  background: #FFFFFF;
+}
+.dark .card-editorial {
+  background: #181A20;
+  border-color: #2E323D;
+}
+
+.progress-wrap-editorial {
+  height: 12px;
+  border: 1px solid var(--ink);
+  padding: 2px;
+  background: #FFFFFF;
+}
+.dark .progress-wrap-editorial {
+  border-color: #363B47;
+  background: #121316;
+}
+
+.progress-fill-editorial {
+  height: 100%;
+  background: var(--ink);
+}
+.dark .progress-fill-editorial {
+  background: var(--accent);
+}
+
+/* Calculator button classes */
+.calc-btn-num {
+  padding: 0.65rem 0.5rem;
+  background: #FFFFFF;
+  border: 1px solid #1B1B19;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1B1B19;
+  transition: all 0.1s ease;
+}
+.dark .calc-btn-num {
+  background: #1A1C24;
+  border-color: #323642;
+  color: #F3F3EE;
+}
+.calc-btn-num:hover {
+  background: #F0EEE9;
+}
+.dark .calc-btn-num:hover {
+  background: #242834;
+}
+
+.calc-btn-op {
+  padding: 0.65rem 0.5rem;
+  background: #F8F7F4;
+  border: 1px solid #1B1B19;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1B1B19;
+  transition: all 0.1s ease;
+}
+.dark .calc-btn-op {
+  background: #202430;
+  border-color: #323642;
+  color: #E5C048;
+}
+.calc-btn-op:hover {
+  background: #E8E5DF;
+}
+.dark .calc-btn-op:hover {
+  background: #2A3040;
+}
+
+.calc-btn-fn {
+  padding: 0.6rem 0.35rem;
+  background: #FFFFFF;
+  border: 1px solid rgba(27, 27, 25, 0.4);
+  font-size: 0.75rem;
+  font-family: 'Space Mono', monospace;
+  color: #1B1B19;
+  transition: all 0.1s ease;
+}
+.dark .calc-btn-fn {
+  background: #16181F;
+  border-color: #323642;
+  color: #D1D5DB;
+}
+.calc-btn-fn:hover {
+  background: #F8F7F4;
+  border-color: #1B1B19;
+}
+.dark .calc-btn-fn:hover {
+  background: #202430;
+  border-color: #E5C048;
+}
+
+.calc-btn-ctrl {
+  padding: 0.65rem 0.5rem;
+  background: #F8F7F4;
+  border: 1px solid #1B1B19;
+  font-weight: 700;
+  transition: all 0.1s ease;
+}
+.dark .calc-btn-ctrl {
+  background: #202430;
+  border-color: #323642;
+}
+.calc-btn-ctrl:hover {
+  background: #E8E5DF;
+}
+.dark .calc-btn-ctrl:hover {
+  background: #2A3040;
+}
+
+.calc-btn-eq {
+  padding: 0.65rem 0.5rem;
+  border: 1px solid #1B1B19;
+  transition: all 0.1s ease;
+}
+.dark .calc-btn-eq {
+  border-color: #E5C048;
+}
+
+/* Print Styles for Parent Report */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    background-image: none !important;
+  }
+  header, footer, nav, button {
+    display: none !important;
+  }
+}
