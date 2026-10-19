@@ -22,6 +22,7 @@ import {
   Moon,
   Scale,
   Sliders,
+  Database,
 } from 'lucide-react';
 import { User } from '../../types';
 import { UserAvatar } from './UserAvatar';
@@ -39,6 +40,7 @@ interface NavbarProps {
   onOpenChat: () => void;
   onOpenAi: () => void;
   onOpenCalculator?: () => void;
+  onOpenDatabase?: () => void;
   onLogout: () => void;
   gamificationStats?: StudentGamificationState;
 }
@@ -53,6 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenChat,
   onOpenAi,
   onOpenCalculator,
+  onOpenDatabase,
   onLogout,
   gamificationStats,
 }) => {
@@ -281,6 +284,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 )}
 
+                {onOpenDatabase && (
+                  <button
+                    onClick={() => {
+                      setToolsMenuOpen(false);
+                      onOpenDatabase();
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-[#F8F7F4] dark:hover:bg-[#202430] text-[#1B1B19] dark:text-[#F3F3EE] flex items-center justify-between group transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded-xs bg-amber-500/10 text-amber-600 dark:text-[#E5C048] flex items-center justify-center">
+                        <Database className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-[11px]">База данных & Бэкап (Vercel)</div>
+                        <div className="text-[10px] text-[#1B1B19]/60 dark:text-gray-400 font-sans">
+                          Где хранятся данные, 1-клик JSON дамп
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-[#D4AF37] opacity-0 group-hover:opacity-100 transition font-mono">→</span>
+                  </button>
+                )}
+
                 <div className="border-t border-[#1B1B19]/10 dark:border-[#323642] my-1" />
 
                 <button
@@ -468,6 +494,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <FileCode2 className="w-3.5 h-3.5 text-emerald-500" />
                 Песочница Python
+              </button>
+            )}
+            {onOpenDatabase && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenDatabase();
+                }}
+                className="w-full text-left py-2 px-3 font-mono text-xs uppercase tracking-wider text-[#1B1B19] dark:text-[#F3F3EE] hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2"
+              >
+                <Database className="w-3.5 h-3.5 text-[#D4AF37]" />
+                База данных & Бэкап (Vercel)
               </button>
             )}
             <button

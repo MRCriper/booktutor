@@ -18,6 +18,7 @@ import { ExamSpecsAndReferenceView } from './components/exam/ExamSpecsAndReferen
 import { XPRewardsStore } from './components/student/XPRewardsStore';
 import { ScientificCalculator } from './components/common/ScientificCalculator';
 import { StudentOnboardingModal } from './components/student/StudentOnboardingModal';
+import { DatabaseSyncModal } from './components/common/DatabaseSyncModal';
 
 export default function App() {
   const [, setTick] = useState(0);
@@ -58,6 +59,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isCalcOpen, setIsCalcOpen] = useState(false);
+  const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
 
   // Subscribe to storage changes
   useEffect(() => {
@@ -161,6 +163,7 @@ export default function App() {
         onOpenChat={() => setIsChatOpen(true)}
         onOpenAi={() => setIsAiOpen(true)}
         onOpenCalculator={() => setIsCalcOpen(true)}
+        onOpenDatabase={() => setIsDatabaseModalOpen(true)}
         onLogout={handleLogout}
         gamificationStats={studentGamification}
       />
@@ -297,6 +300,13 @@ export default function App() {
       <ScientificCalculator
         isOpen={isCalcOpen}
         onClose={() => setIsCalcOpen(false)}
+      />
+
+      {/* Database & Vercel Storage Hub Modal */}
+      <DatabaseSyncModal
+        isOpen={isDatabaseModalOpen}
+        onClose={() => setIsDatabaseModalOpen(false)}
+        onDataRestored={() => setTick((t) => t + 1)}
       />
 
       {/* Parent Report Modal */}

@@ -551,6 +551,84 @@ class StorageService {
     return newMat;
   }
 
+  public batchAddStudyMaterials(newMats: Array<Omit<StudyMaterial, 'id'> & { id?: string }>): StudyMaterial[] {
+    const existing = this.getStudyMaterials();
+    const created: StudyMaterial[] = newMats.map((m, idx) => ({
+      id: m.id || `mat-${Date.now()}-${idx}`,
+      subject: m.subject || 'math',
+      title: m.title || `Учебный материал #${idx + 1}`,
+      topic: m.topic || 'Теория и формулы',
+      type: m.type || 'lecture_notes',
+      content: m.content || '',
+      keyFormulas: Array.isArray(m.keyFormulas) ? m.keyFormulas : [],
+      externalUrl: m.externalUrl || undefined,
+      readTimeMinutes: typeof m.readTimeMinutes === 'number' ? m.readTimeMinutes : 10,
+    }));
+    this.setItem(STORAGE_KEYS.MATERIALS, [...created, ...existing]);
+    return created;
+  }
+
+  public deleteStudyMaterial(id: string): void {
+    const list = this.getStudyMaterials().filter((m) => m.id !== id);
+    this.setItem(STORAGE_KEYS.MATERIALS, list);
+  }
+
+  public updateStudyMaterial(updated: StudyMaterial): void {
+    const list = this.getStudyMaterials().map((m) => (m.id === updated.id ? updated : m));
+    this.setItem(STORAGE_KEYS.MATERIALS, list);
+  }
+
+  // Full Database Backup & Restore (Vercel-ready data migration)
+  public exportFullBackup(): string {
+    const backup = {
+      app: 'BookTutor Pro',
+      version: '7.0',
+      exportedAt: new Date().toISOString(),
+      data: {
+        users: this.getUsers(),
+        slots: this.getItem(STORAGE_KEYS.SLOTS, []),
+        tasks: this.getItem(STORAGE_KEYS.TASKS, []),
+        homeworks: this.getHomeworks(),
+        materials: this.getStudyMaterials(),
+        variants: this.getItem(STORAGE_KEYS.VARIANTS, []),
+        notes: this.getInformalNotes(),
+        topicProgress: this.getItem(STORAGE_KEYS.TOPIC_PROGRESS, []),
+        examNumbers: this.getItem(STORAGE_KEYS.EXAM_NUMBERS, []),
+        chatMessages: this.getItem(STORAGE_KEYS.CHAT_MESSAGES, []),
+        xpRewards: this.getItem(STORAGE_KEYS.XP_REWARDS, []),
+      },
+    };
+    return JSON.stringify(backup, null, 2);
+  }
+
+  public importFullBackup(jsonString: string): { success: boolean; error?: string; summary?: string } {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const data = parsed.data || parsed;
+      if (!data || typeof data !== 'object') {
+        return { success: false, error: 'Неверный формат файла бэкапа' };
+      }
+      if (Array.isArray(data.users)) this.setItem(STORAGE_KEYS.USERS, data.users);
+      if (Array.isArray(data.slots)) this.setItem(STORAGE_KEYS.SLOTS, data.slots);
+      if (Array.isArray(data.tasks)) this.setItem(STORAGE_KEYS.TASKS, data.tasks);
+      if (Array.isArray(data.homeworks)) this.setItem(STORAGE_KEYS.HOMEWORKS, data.homeworks);
+      if (Array.isArray(data.materials)) this.setItem(STORAGE_KEYS.MATERIALS, data.materials);
+      if (Array.isArray(data.variants)) this.setItem(STORAGE_KEYS.VARIANTS, data.variants);
+      if (Array.isArray(data.notes)) this.setItem(STORAGE_KEYS.INFORMAL_NOTES, data.notes);
+      if (Array.isArray(data.topicProgress)) this.setItem(STORAGE_KEYS.TOPIC_PROGRESS, data.topicProgress);
+      if (Array.isArray(data.examNumbers)) this.setItem(STORAGE_KEYS.EXAM_NUMBERS, data.examNumbers);
+      if (Array.isArray(data.chatMessages)) this.setItem(STORAGE_KEYS.CHAT_MESSAGES, data.chatMessages);
+      if (Array.isArray(data.xpRewards)) this.setItem(STORAGE_KEYS.XP_REWARDS, data.xpRewards);
+
+      return {
+        success: true,
+        summary: `Успешно восстановлено: ДЗ (${data.homeworks?.length || 0}), материалов (${data.materials?.length || 0}), задач (${data.tasks?.length || 0}), слотов (${data.slots?.length || 0}), учеников (${data.users?.length || 0})`,
+      };
+    } catch (e: any) {
+      return { success: false, error: `Ошибка чтения JSON: ${e.message}` };
+    }
+  }
+
   // Topic Progress
   public getTopicProgress(): ExamTopicProgress[] {
     const list = this.getItem<ExamTopicProgress[]>(STORAGE_KEYS.TOPIC_PROGRESS, FULL_EXAM_TOPICS);

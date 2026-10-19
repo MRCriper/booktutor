@@ -34,6 +34,7 @@ import {
   EyeOff,
   Upload,
   Scale,
+  FileCode2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -147,8 +148,36 @@ export const TutorDashboard: React.FC<TutorDashboardProps> = ({
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showVariantBuilderModal, setShowVariantBuilderModal] = useState(false);
   const [showBatchImportModal, setShowBatchImportModal] = useState(false);
-  const [batchImportMode, setBatchImportMode] = useState<'all' | 'homeworks' | 'tasks' | 'variants'>('all');
+  const [batchImportMode, setBatchImportMode] = useState<'all' | 'homeworks' | 'tasks' | 'variants' | 'materials'>('all');
+  const [hwSubView, setHwSubView] = useState<'homeworks' | 'materials'>('homeworks');
+  const [materialSubjectFilter, setMaterialSubjectFilter] = useState<Subject | 'all'>('all');
+  const [materialTypeFilter, setMaterialTypeFilter] = useState<string>('all');
+  const [materialSearchQuery, setMaterialSearchQuery] = useState('');
+  const [copiedMaterialId, setCopiedMaterialId] = useState<string | null>(null);
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+
+  const handleExportMaterialsJson = () => {
+    const list = storage.getStudyMaterials();
+    const blob = new Blob([JSON.stringify({ materials: list }, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `booktutor_materials_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyMaterialJson = (mat: StudyMaterial) => {
+    navigator.clipboard.writeText(JSON.stringify(mat, null, 2));
+    setCopiedMaterialId(mat.id);
+    setTimeout(() => setCopiedMaterialId(null), 2000);
+  };
+
+  const handleDeleteMaterial = (id: string) => {
+    storage.deleteStudyMaterial(id);
+  };
 
   // New Task Form
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -1050,10 +1079,68 @@ export const TutorDashboard: React.FC<TutorDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB: HOMEWORKS & PRACTICE (with JSON batch import) */}
+      {/* TAB: HOMEWORKS & THEORY MATERIALS */}
       {activeTab === 'homeworks' && (
         <div className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 bg-white border border-[#1B1B19] shadow-2xs">
+          {/* Sub-navigation Switcher: Homeworks vs Theory Materials */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-white border border-[#1B1B19] shadow-2xs font-mono text-xs">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setHwSubView('homeworks')}
+                className={`px-4 py-2 font-bold uppercase tracking-wider transition flex items-center gap-2 cursor-pointer ${
+                  hwSubView === 'homeworks'
+                    ? 'bg-[#1B1B19] text-[#F8F7F4] shadow-2xs'
+                    : 'bg-[#F8F7F4] text-[#1B1B19] hover:bg-black/5'
+                }`}
+              >
+                <FileCode2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+                Домашние задания ({homeworks.length})
+              </button>
+              <button
+                onClick={() => setHwSubView('materials')}
+                className={`px-4 py-2 font-bold uppercase tracking-wider transition flex items-center gap-2 cursor-pointer ${
+                  hwSubView === 'materials'
+                    ? 'bg-[#1B1B19] text-[#F8F7F4] shadow-2xs'
+                    : 'bg-[#F8F7F4] text-[#1B1B19] hover:bg-black/5'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-[#D4AF37]" />
+                Теория & Конспекты ({storage.getStudyMaterials().length})
+              </button>
+            </div>
+
+            {hwSubView === 'materials' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    setBatchImportMode('materials');
+                    setShowBatchImportModal(true);
+                  }}
+                  className="font-mono text-xs font-bold uppercase tracking-wider px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-400 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Загрузить теорию/конспекты из JSON-файла"
+                >
+                  <Upload className="w-3.5 h-3.5 text-purple-600" /> Импорт теории из JSON
+                </button>
+                <button
+                  onClick={handleExportMaterialsJson}
+                  className="font-mono text-xs font-bold uppercase tracking-wider px-3 py-1.5 bg-white hover:bg-[#F8F7F4] text-[#1B1B19] border border-[#1B1B19]/30 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Экспортировать все конспекты в файл .json"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#D4AF37]" /> Экспорт в JSON
+                </button>
+                <button
+                  onClick={() => setShowAddMaterialModal(true)}
+                  className="font-mono text-xs font-bold uppercase tracking-wider px-3 py-1.5 bg-[#1B1B19] hover:bg-black text-[#F8F7F4] transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#D4AF37]" /> + Добавить конспект
+                </button>
+              </div>
+            )}
+          </div>
+
+          {hwSubView === 'homeworks' && (
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 bg-white border border-[#1B1B19] shadow-2xs">
             <div>
               <div className="label-academic mb-0.5">Домашние задания & Практика</div>
               <h3 className="font-serif text-xl font-bold text-[#1B1B19]">Журнал домашних заданий</h3>
@@ -1331,6 +1418,206 @@ export const TutorDashboard: React.FC<TutorDashboardProps> = ({
                   </motion.div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+          {/* SUB-VIEW 2: STUDY MATERIALS & THEORY */}
+          {hwSubView === 'materials' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-white border border-[#1B1B19] flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs font-mono shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="label-academic mr-1">Предмет:</span>
+                  {(['all', 'math', 'physics', 'cs', 'russian'] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setMaterialSubjectFilter(s)}
+                      className={`font-mono text-xs px-2.5 py-1 border transition ${
+                        materialSubjectFilter === s
+                          ? 'bg-[#1B1B19] text-[#F8F7F4] border-[#1B1B19] font-bold'
+                          : 'bg-white text-[#1B1B19] border-[#1B1B19]/25 hover:border-[#1B1B19]'
+                      }`}
+                    >
+                      {s === 'all'
+                        ? 'Все'
+                        : s === 'math'
+                        ? 'Математика'
+                        : s === 'physics'
+                        ? 'Физика'
+                        : s === 'cs'
+                        ? 'Информатика'
+                        : 'Русский'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={materialTypeFilter}
+                    onChange={(e) => setMaterialTypeFilter(e.target.value)}
+                    className="bg-[#F8F7F4] text-[#1B1B19] border border-[#1B1B19]/30 px-2 py-1 text-xs focus:outline-none"
+                  >
+                    <option value="all">Все форматы</option>
+                    <option value="lecture_notes">Конспекты лекций</option>
+                    <option value="formula_pack">Пакеты формул</option>
+                    <option value="cheat_sheet">Шпаргалки</option>
+                    <option value="code_sample">Примеры кода</option>
+                  </select>
+
+                  <div className="relative w-48 sm:w-64">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#1B1B19]/50" />
+                    <input
+                      type="text"
+                      value={materialSearchQuery}
+                      onChange={(e) => setMaterialSearchQuery(e.target.value)}
+                      placeholder="Поиск по теории, теме..."
+                      className="w-full bg-[#F8F7F4] text-[#1B1B19] pl-8 pr-3 py-1 text-xs border border-[#1B1B19]/30 focus:outline-none focus:border-[#1B1B19]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid of Materials */}
+              {(() => {
+                const allMats = storage.getStudyMaterials();
+                const filtered = allMats.filter((m) => {
+                  if (materialSubjectFilter !== 'all' && m.subject !== materialSubjectFilter) return false;
+                  if (materialTypeFilter !== 'all' && m.type !== materialTypeFilter) return false;
+                  if (materialSearchQuery.trim()) {
+                    const q = materialSearchQuery.toLowerCase();
+                    const matchTitle = m.title.toLowerCase().includes(q);
+                    const matchTopic = m.topic.toLowerCase().includes(q);
+                    const matchContent = m.content.toLowerCase().includes(q);
+                    if (!matchTitle && !matchTopic && !matchContent) return false;
+                  }
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="p-12 bg-white border border-[#1B1B19] text-center space-y-3 shadow-2xs">
+                      <BookOpen className="w-8 h-8 text-[#D4AF37] mx-auto" />
+                      <div className="font-serif text-lg font-bold text-[#1B1B19]">
+                        Конспекты по выбранным критериям не найдены
+                      </div>
+                      <p className="text-xs font-mono text-[#1B1B19]/60 max-w-md mx-auto">
+                        Загрузите теоретические материалы и формулы через JSON-файл или создайте новый конспект вручную.
+                      </p>
+                      <div className="flex items-center justify-center gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            setBatchImportMode('materials');
+                            setShowBatchImportModal(true);
+                          }}
+                          className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-400 font-mono text-xs font-bold uppercase transition cursor-pointer"
+                        >
+                          Импорт теории из JSON
+                        </button>
+                        <button
+                          onClick={() => setShowAddMaterialModal(true)}
+                          className="px-4 py-2 bg-[#1B1B19] hover:bg-black text-[#F8F7F4] font-mono text-xs font-bold uppercase transition cursor-pointer"
+                        >
+                          + Создать конспект
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filtered.map((mat) => (
+                      <motion.div
+                        key={mat.id}
+                        whileHover={{ y: -2 }}
+                        className="p-5 bg-white border border-[#1B1B19]/20 flex flex-col justify-between space-y-3.5 shadow-2xs"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border border-[#1B1B19]/20 bg-[#F8F7F4] text-[#1B1B19]">
+                                {mat.subject.toUpperCase()}
+                              </span>
+                              <span className="font-mono text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 border border-purple-200 font-bold">
+                                {mat.type === 'formula_pack'
+                                  ? 'Пакет формул'
+                                  : mat.type === 'cheat_sheet'
+                                  ? 'Шпаргалка'
+                                  : mat.type === 'code_sample'
+                                  ? 'Шаблон кода'
+                                  : 'Конспект лекции'}
+                              </span>
+                            </div>
+                            <span className="text-xs font-mono text-[#1B1B19]/60">
+                              ⏱ {mat.readTimeMinutes} мин чтения
+                            </span>
+                          </div>
+
+                          <h4 className="font-serif text-lg font-bold text-[#1B1B19] leading-snug">
+                            {mat.title}
+                          </h4>
+                          <div className="text-xs font-mono text-[#1B1B19]/60 mt-0.5">
+                            Тема: <span className="font-bold text-[#1B1B19]">{mat.topic}</span>
+                          </div>
+
+                          <div className="mt-2.5 p-3.5 bg-[#F8F7F4] border border-[#1B1B19]/15 text-xs text-[#1B1B19] leading-relaxed max-h-48 overflow-y-auto">
+                            <MathRenderer content={mat.content} />
+                          </div>
+
+                          {mat.keyFormulas && mat.keyFormulas.length > 0 && (
+                            <div className="mt-3 space-y-1.5">
+                              <span className="label-academic text-[#D4AF37] block">
+                                Ключевые формулы ({mat.keyFormulas.length}):
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {mat.keyFormulas.map((f, i) => (
+                                  <FormulaView key={i} formula={f} />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {mat.externalUrl && (
+                            <div className="mt-2">
+                              <a
+                                href={mat.externalUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-mono text-blue-700 hover:underline font-bold"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Персональная ссылка / Ресурс
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-[#1B1B19]/10 flex items-center justify-between text-xs font-mono">
+                          <button
+                            onClick={() => handleCopyMaterialJson(mat)}
+                            className="px-2.5 py-1 bg-[#F8F7F4] hover:bg-[#1B1B19] hover:text-white border border-[#1B1B19]/20 transition flex items-center gap-1 cursor-pointer"
+                            title="Скопировать JSON-объект конспекта"
+                          >
+                            {copiedMaterialId === mat.id ? (
+                              <Check className="w-3 h-3 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3 h-3 text-[#D4AF37]" />
+                            )}
+                            {copiedMaterialId === mat.id ? 'Скопировано!' : 'Копировать JSON'}
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteMaterial(mat.id)}
+                            className="text-rose-600 hover:text-rose-800 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Удалить
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -2392,14 +2679,11 @@ export const TutorDashboard: React.FC<TutorDashboardProps> = ({
         }}
       />
 
-      {/* Batch JSON Import Modal for Tasks, Variants & Homeworks */}
+      {/* Batch JSON Import Modal for Tasks, Variants, Homeworks & Materials */}
       <BatchImportModal
         isOpen={showBatchImportModal}
         onClose={() => setShowBatchImportModal(false)}
         defaultMode={batchImportMode}
-        onSuccess={() => {
-          // Handled via storage subscriptions
-        }}
       />
     </div>
   );

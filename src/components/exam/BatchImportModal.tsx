@@ -17,15 +17,58 @@ import {
   BookOpen,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Task, ExamVariant, Subject, VariantTask, Homework, User } from '../../types';
+import { Task, ExamVariant, Subject, VariantTask, Homework, User, StudyMaterial } from '../../types';
 import { storage } from '../../services/storage';
 
 interface BatchImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-  defaultMode?: 'tasks' | 'variants' | 'homeworks' | 'all';
+  defaultMode?: 'tasks' | 'variants' | 'homeworks' | 'materials' | 'all';
 }
+
+const SAMPLE_MATERIALS_TEMPLATE: Omit<StudyMaterial, 'id'>[] = [
+  {
+    title: 'Шпаргалка: Стереометрия и координатный метод (ЕГЭ №14)',
+    subject: 'math',
+    topic: 'Стереометрия и векторы',
+    type: 'formula_pack',
+    content: 'Координатный метод в правильной призме и пирамиде:\n1) Задайте декартову систему координат с началом в одной из вершин основания.\n2) Найдите координаты ключевых точек.\n3) Уравнение нормали к плоскости: n = (A, B, C).\n4) Формула расстояния: d = |Ax_0 + By_0 + Cz_0 + D| / sqrt(A^2 + B^2 + C^2).',
+    keyFormulas: [
+      'd = \\frac{|Ax_0 + By_0 + Cz_0 + D|}{\\sqrt{A^2 + B^2 + C^2}}',
+      '\\cos \\varphi = \\frac{|a_1 a_2 + b_1 b_2 + c_1 c_2|}{\\sqrt{a_1^2 + b_1^2 + c_1^2}\\sqrt{a_2^2 + b_2^2 + c_2^2}}',
+      'V = \\frac{1}{3} S_{осн} h'
+    ],
+    readTimeMinutes: 12,
+    externalUrl: 'https://fipi.ru',
+  },
+  {
+    title: 'Конспект: Законы геометрической и волновой оптики',
+    subject: 'physics',
+    topic: 'Оптика и линзы (№15-18 ЕГЭ)',
+    type: 'lecture_notes',
+    content: 'Закон преломления Снеллиуса: n1 * sin(alpha) = n2 * sin(beta).\nФормула тонкой линзы: 1/F = 1/d + 1/f (+ для собирающей, - для рассеивающей).\nОптическая сила линзы: D = 1/F (дптр).\nЛинейное увеличение: Gamma = f / d.',
+    keyFormulas: [
+      'n_1 \\sin \\alpha = n_2 \\sin \\beta',
+      '\\pm \\frac{1}{F} = \\frac{1}{d} \\pm \\frac{1}{f}',
+      'D = \\frac{1}{F}'
+    ],
+    readTimeMinutes: 10,
+  },
+  {
+    title: 'Памятка: Динамическое программирование и префиксные суммы на Python',
+    subject: 'cs',
+    topic: 'КЕГЭ №27: Эффективная обработка последовательностей',
+    type: 'code_sample',
+    content: 'Поиск непрерывного отрезка с максимальной суммой, кратной K:\nmod_map = {0: 0}\ncur_sum = 0\nmax_len = 0\nfor i, x in enumerate(data, 1):\n    cur_sum += x\n    r = cur_sum % K\n    if r in mod_map:\n        max_len = max(max_len, i - mod_map[r])\n    else:\n        mod_map[r] = i',
+    keyFormulas: [
+      'O(N) \\text{ время}',
+      'O(K) \\text{ память}',
+      '\\text{lru\\_cache(None)}'
+    ],
+    readTimeMinutes: 15,
+  },
+];
 
 const SAMPLE_TASKS_TEMPLATE: Omit<Task, 'id' | 'createdAt'>[] = [
   {
@@ -146,9 +189,10 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
   const [parsedTasks, setParsedTasks] = useState<Task[]>([]);
   const [parsedVariants, setParsedVariants] = useState<ExamVariant[]>([]);
   const [parsedHomeworks, setParsedHomeworks] = useState<Homework[]>([]);
+  const [parsedMaterials, setParsedMaterials] = useState<StudyMaterial[]>([]);
   const [isCopied, setIsCopied] = useState(false);
-  const [sampleType, setSampleType] = useState<'homeworks' | 'tasks' | 'variants' | 'universal'>(
-    defaultMode === 'homeworks' ? 'homeworks' : 'universal'
+  const [sampleType, setSampleType] = useState<'materials' | 'homeworks' | 'tasks' | 'variants' | 'universal'>(
+    defaultMode === 'homeworks' ? 'homeworks' : defaultMode === 'materials' ? 'materials' : 'universal'
   );
 
   if (!isOpen) return null;
@@ -175,11 +219,16 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
     downloadFile(JSON.stringify(SAMPLE_HOMEWORK_TEMPLATE, null, 2), 'homework_template.json');
   };
 
+  const handleDownloadMaterialsTemplate = () => {
+    downloadFile(JSON.stringify({ materials: SAMPLE_MATERIALS_TEMPLATE }, null, 2), 'materials_template.json');
+  };
+
   const handleDownloadUniversalTemplate = () => {
     const universal = {
+      materials: SAMPLE_MATERIALS_TEMPLATE,
+      homeworks: SAMPLE_HOMEWORK_TEMPLATE,
       tasks: SAMPLE_TASKS_TEMPLATE,
       variants: [SAMPLE_VARIANT_TEMPLATE],
-      homeworks: SAMPLE_HOMEWORK_TEMPLATE,
     };
     downloadFile(JSON.stringify(universal, null, 2), 'universal_import_template.json');
   };
@@ -190,6 +239,7 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
     setParsedTasks([]);
     setParsedVariants([]);
     setParsedHomeworks([]);
+    setParsedMaterials([]);
 
     const trimmed = rawText.trim();
     if (!trimmed) {
@@ -208,10 +258,22 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
     const tasksToImport: Task[] = [];
     const variantsToImport: ExamVariant[] = [];
     const homeworksToImport: Homework[] = [];
+    const materialsToImport: StudyMaterial[] = [];
     const warnings: string[] = [];
 
-    // 1. Universal object { tasks?: [], variants?: [], homeworks?: [] }
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.tasks || parsed.variants || parsed.homeworks)) {
+    // 1. Universal object { tasks?: [], variants?: [], homeworks?: [], materials?: [] }
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed) &&
+      (parsed.tasks || parsed.variants || parsed.homeworks || parsed.materials)
+    ) {
+      if (Array.isArray(parsed.materials)) {
+        parsed.materials.forEach((item: any, idx: number) => {
+          const res = sanitizeMaterial(item, idx, warnings);
+          if (res) materialsToImport.push(res);
+        });
+      }
       if (Array.isArray(parsed.tasks)) {
         parsed.tasks.forEach((item: any, idx: number) => {
           const res = sanitizeTask(item, idx, warnings);
@@ -234,8 +296,21 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
     // 2. Direct Array
     else if (Array.isArray(parsed)) {
       parsed.forEach((item: any, idx: number) => {
-        // Detect if Homework item
+        // Detect if Study Material item
         if (
+          item.readTimeMinutes !== undefined ||
+          item.keyFormulas ||
+          item.type === 'cheat_sheet' ||
+          item.type === 'formula_pack' ||
+          item.type === 'lecture_notes' ||
+          item.type === 'code_sample' ||
+          (item.content && (item.topic || item.subject) && !item.correctAnswer && !item.dueDate)
+        ) {
+          const res = sanitizeMaterial(item, idx, warnings);
+          if (res) materialsToImport.push(res);
+        }
+        // Detect if Homework item
+        else if (
           item.dueDate ||
           item.assignedDate ||
           item['на какую дату'] ||
@@ -260,6 +335,17 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
     // 3. Single Object
     else if (parsed && typeof parsed === 'object') {
       if (
+        parsed.readTimeMinutes !== undefined ||
+        parsed.keyFormulas ||
+        parsed.type === 'cheat_sheet' ||
+        parsed.type === 'formula_pack' ||
+        parsed.type === 'lecture_notes' ||
+        parsed.type === 'code_sample' ||
+        (parsed.content && (parsed.topic || parsed.subject) && !parsed.correctAnswer && !parsed.dueDate)
+      ) {
+        const res = sanitizeMaterial(parsed, 0, warnings);
+        if (res) materialsToImport.push(res);
+      } else if (
         parsed.dueDate ||
         parsed.assignedDate ||
         parsed['на какую дату'] ||
@@ -277,15 +363,20 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
         const res = sanitizeTask(parsed, 0, warnings);
         if (res) tasksToImport.push(res);
       } else {
-        setParseError('Не удалось распознать формат JSON. Предоставьте массив заданий, вариант или домашнее задание.');
+        setParseError('Не удалось распознать формат JSON. Предоставьте конспекты, задания, вариант или домашнее задание.');
         return;
       }
     } else {
-      setParseError('Не удалось распознать формат. Предоставьте массив объектов или пакет { tasks, variants, homeworks }.');
+      setParseError('Не удалось распознать формат. Предоставьте массив объектов или пакет { materials, homeworks, tasks, variants }.');
       return;
     }
 
-    if (tasksToImport.length === 0 && variantsToImport.length === 0 && homeworksToImport.length === 0) {
+    if (
+      tasksToImport.length === 0 &&
+      variantsToImport.length === 0 &&
+      homeworksToImport.length === 0 &&
+      materialsToImport.length === 0
+    ) {
       setParseError('Не найдено ни одного корректного элемента для импорта.');
       return;
     }
@@ -293,7 +384,51 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
     setParsedTasks(tasksToImport);
     setParsedVariants(variantsToImport);
     setParsedHomeworks(homeworksToImport);
+    setParsedMaterials(materialsToImport);
     setValidationWarnings(warnings);
+  };
+
+  const sanitizeMaterial = (raw: any, idx: number, warnings: string[]): StudyMaterial | null => {
+    if (!raw || typeof raw !== 'object') {
+      warnings.push(`Материал #${idx + 1} пропущен: не является объектом.`);
+      return null;
+    }
+
+    const title = String(raw.title || raw.название || `Учебный конспект #${idx + 1}`);
+    const validSubjects: Subject[] = ['math', 'physics', 'cs', 'russian'];
+    const subjectRaw = raw.subject || raw.предмет;
+    let subject: Subject = 'math';
+    if (subjectRaw) {
+      const lower = String(subjectRaw).toLowerCase();
+      if (lower.includes('физ') || lower === 'physics') subject = 'physics';
+      else if (lower.includes('инф') || lower === 'cs') subject = 'cs';
+      else if (lower.includes('рус') || lower === 'russian') subject = 'russian';
+      else if (lower.includes('мат') || lower === 'math') subject = 'math';
+    }
+
+    const validTypes = ['cheat_sheet', 'formula_pack', 'lecture_notes', 'code_sample'];
+    let type: StudyMaterial['type'] = 'lecture_notes';
+    if (validTypes.includes(raw.type)) {
+      type = raw.type;
+    } else if (raw.keyFormulas && Array.isArray(raw.keyFormulas) && raw.keyFormulas.length > 0) {
+      type = 'formula_pack';
+    }
+
+    const keyFormulas: string[] = Array.isArray(raw.keyFormulas || raw.формулы)
+      ? (raw.keyFormulas || raw.формулы).map(String)
+      : [];
+
+    return {
+      id: raw.id || `imported-mat-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      title,
+      subject,
+      topic: String(raw.topic || raw.тема || 'Общая теория'),
+      type,
+      content: String(raw.content || raw.конспект || raw.текст || ''),
+      keyFormulas,
+      externalUrl: raw.externalUrl || raw.ссылка ? String(raw.externalUrl || raw.ссылка) : undefined,
+      readTimeMinutes: typeof raw.readTimeMinutes === 'number' ? raw.readTimeMinutes : 10,
+    };
   };
 
   const sanitizeTask = (raw: any, idx: number, warnings: string[]): Task | null => {
@@ -523,14 +658,25 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
       setParsedTasks([]);
       setParsedVariants([]);
       setParsedHomeworks([]);
+      setParsedMaterials([]);
       setParseError(null);
       setValidationWarnings([]);
     }
   };
 
   const handleExecuteImport = () => {
-    if (parsedTasks.length === 0 && parsedVariants.length === 0 && parsedHomeworks.length === 0) return;
+    if (
+      parsedTasks.length === 0 &&
+      parsedVariants.length === 0 &&
+      parsedHomeworks.length === 0 &&
+      parsedMaterials.length === 0
+    ) {
+      return;
+    }
 
+    if (parsedMaterials.length > 0) {
+      storage.batchAddStudyMaterials(parsedMaterials);
+    }
     if (parsedTasks.length > 0) {
       storage.batchAddTasks(parsedTasks);
     }
@@ -548,7 +694,9 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
 
   const handleCopySample = () => {
     let sampleData: any;
-    if (sampleType === 'homeworks') {
+    if (sampleType === 'materials') {
+      sampleData = { materials: SAMPLE_MATERIALS_TEMPLATE };
+    } else if (sampleType === 'homeworks') {
       sampleData = { homeworks: SAMPLE_HOMEWORK_TEMPLATE };
     } else if (sampleType === 'tasks') {
       sampleData = { tasks: SAMPLE_TASKS_TEMPLATE };
@@ -556,6 +704,7 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
       sampleData = { variants: [SAMPLE_VARIANT_TEMPLATE] };
     } else {
       sampleData = {
+        materials: SAMPLE_MATERIALS_TEMPLATE,
         homeworks: SAMPLE_HOMEWORK_TEMPLATE,
         tasks: SAMPLE_TASKS_TEMPLATE.slice(0, 1),
         variants: [SAMPLE_VARIANT_TEMPLATE],
@@ -566,7 +715,8 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const totalImportCount = parsedTasks.length + parsedVariants.length + parsedHomeworks.length;
+  const totalImportCount =
+    parsedTasks.length + parsedVariants.length + parsedHomeworks.length + parsedMaterials.length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 dark:bg-black/80 backdrop-blur-xs">
@@ -737,6 +887,18 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
               <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#F8F7F4] dark:bg-[#121316] border border-[#1B1B19]/15 dark:border-[#323642]">
                 <button
                   type="button"
+                  onClick={() => setSampleType('materials')}
+                  className={`px-3 py-1.5 transition font-bold text-xs cursor-pointer flex items-center gap-1.5 ${
+                    sampleType === 'materials'
+                      ? 'bg-[#1B1B19] text-[#F8F7F4] dark:bg-[#E5C048] dark:text-[#121316]'
+                      : 'text-[#1B1B19]/70 dark:text-gray-300 hover:text-[#1B1B19]'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Теория и Конспекты
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSampleType('homeworks')}
                   className={`px-3 py-1.5 transition font-bold text-xs cursor-pointer ${
                     sampleType === 'homeworks'
@@ -783,32 +945,52 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
 
               <div className="flex items-center justify-between border-b border-[#1B1B19]/15 dark:border-[#323642] pb-2">
                 <span className="font-bold text-[#1B1B19] dark:text-[#F3F3EE]">
-                  {sampleType === 'homeworks'
+                  {sampleType === 'materials'
+                    ? 'Шаблон JSON для теории и конспектов (шпаргалки, формулы):'
+                    : sampleType === 'homeworks'
                     ? 'Шаблон JSON для домашних заданий:'
                     : sampleType === 'tasks'
                     ? 'Шаблон JSON для банка задач:'
                     : sampleType === 'variants'
                     ? 'Шаблон JSON для экзаменационного варианта:'
-                    : 'Универсальный JSON (ДЗ + Задачи + Вариант):'}
+                    : 'Универсальный JSON (Теория + ДЗ + Задачи + Вариант):'}
                 </span>
-                <button
-                  onClick={handleCopySample}
-                  className="px-2.5 py-1 bg-[#1B1B19] text-[#F8F7F4] dark:bg-[#E5C048] dark:text-[#121316] flex items-center gap-1 font-bold cursor-pointer"
-                >
-                  {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  {isCopied ? 'Скопировано!' : 'Скопировать образец'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (sampleType === 'materials') handleDownloadMaterialsTemplate();
+                      else if (sampleType === 'homeworks') handleDownloadHomeworkTemplate();
+                      else if (sampleType === 'tasks') handleDownloadTasksTemplate();
+                      else if (sampleType === 'variants') handleDownloadVariantTemplate();
+                      else handleDownloadUniversalTemplate();
+                    }}
+                    className="px-2.5 py-1 bg-white dark:bg-[#202430] border border-[#1B1B19]/30 dark:border-[#383C4A] text-[#1B1B19] dark:text-[#F3F3EE] flex items-center gap-1 font-bold cursor-pointer text-[11px]"
+                    title="Скачать файл шаблона .json"
+                  >
+                    <Download className="w-3 h-3 text-[#D4AF37]" /> Скачать .json
+                  </button>
+                  <button
+                    onClick={handleCopySample}
+                    className="px-2.5 py-1 bg-[#1B1B19] text-[#F8F7F4] dark:bg-[#E5C048] dark:text-[#121316] flex items-center gap-1 font-bold cursor-pointer text-[11px]"
+                  >
+                    {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {isCopied ? 'Скопировано!' : 'Копировать'}
+                  </button>
+                </div>
               </div>
 
               <pre className="p-3 bg-[#F8F7F4] dark:bg-[#121316] border border-[#1B1B19]/15 dark:border-[#323642] text-[#1B1B19] dark:text-[#F3F3EE] overflow-x-auto max-h-60 text-[11px]">
 {JSON.stringify(
-  sampleType === 'homeworks'
+  sampleType === 'materials'
+    ? { materials: SAMPLE_MATERIALS_TEMPLATE }
+    : sampleType === 'homeworks'
     ? { homeworks: SAMPLE_HOMEWORK_TEMPLATE }
     : sampleType === 'tasks'
     ? { tasks: SAMPLE_TASKS_TEMPLATE }
     : sampleType === 'variants'
     ? { variants: [SAMPLE_VARIANT_TEMPLATE] }
     : {
+        materials: SAMPLE_MATERIALS_TEMPLATE.slice(0, 1),
         homeworks: SAMPLE_HOMEWORK_TEMPLATE,
         tasks: SAMPLE_TASKS_TEMPLATE.slice(0, 1),
         variants: [SAMPLE_VARIANT_TEMPLATE],
@@ -818,7 +1000,21 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
 )}
               </pre>
 
-              {sampleType === 'homeworks' ? (
+              {sampleType === 'materials' ? (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-600/30 text-amber-900 dark:text-amber-200 text-xs font-sans space-y-1.5">
+                  <strong>Параметры структуры теории (конспектов):</strong>
+                  <ul className="list-disc list-inside space-y-0.5 text-xs">
+                    <li><code>title</code> (или <code>название</code>) — заголовок конспекта или шпаргалки</li>
+                    <li><code>subject</code> (или <code>предмет</code>) — <code>'math'</code> | <code>'physics'</code> | <code>'cs'</code> | <code>'russian'</code></li>
+                    <li><code>topic</code> (или <code>тема</code>) — тема КИМ (например: <em>«Стереометрия и координаты»</em>)</li>
+                    <li><code>type</code> — тип материала: <code>'formula_pack'</code> (пакет формул), <code>'lecture_notes'</code> (конспект), <code>'cheat_sheet'</code> (шпаргалка), <code>'code_sample'</code> (пример кода)</li>
+                    <li><code>content</code> (или <code>текст</code> / <code>конспект</code>) — подробный текст с объяснением правил, алгоритмов и теорем</li>
+                    <li><code>keyFormulas</code> (опционально) — массив ключевых формул в формате LaTeX (например: <code>{"['d = \\\\frac{|Ax_0+By_0+Cz_0+D|}{\\\\sqrt{A^2+B^2+C^2}}']"}</code>)</li>
+                    <li><code>readTimeMinutes</code> (опционально) — примерное время чтения в минутах (по умолчанию 10)</li>
+                    <li><code>externalUrl</code> (опционально) — ссылка на методичку, ФИПИ или персональную доску Miro</li>
+                  </ul>
+                </div>
+              ) : sampleType === 'homeworks' ? (
                 <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-600/30 text-amber-900 dark:text-amber-200 text-xs font-sans space-y-1.5">
                   <strong>Параметры структуры домашнего задания (ДЗ):</strong>
                   <ul className="list-disc list-inside space-y-0.5 text-xs">
@@ -846,7 +1042,7 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
               ) : (
                 <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-600/30 text-amber-900 dark:text-amber-200 text-xs font-sans space-y-1">
                   <strong>Универсальный пакет:</strong>
-                  <p>Поддерживает одновременную пакетную загрузку заданий в банк (<code>tasks</code>), готовых вариантов КИМ (<code>variants</code>) и персональных домашних работ (<code>homeworks</code>).</p>
+                  <p>Поддерживает одновременную пакетную загрузку теории и конспектов (<code>materials</code>), заданий в банк (<code>tasks</code>), готовых вариантов КИМ (<code>variants</code>) и персональных домашних работ (<code>homeworks</code>).</p>
                 </div>
               )}
             </div>
@@ -879,7 +1075,10 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
           )}
 
           {/* Preview Section */}
-          {(parsedTasks.length > 0 || parsedVariants.length > 0 || parsedHomeworks.length > 0) && (
+          {(parsedTasks.length > 0 ||
+            parsedVariants.length > 0 ||
+            parsedHomeworks.length > 0 ||
+            parsedMaterials.length > 0) && (
             <div className="space-y-3 pt-2 border-t border-[#1B1B19]/15 dark:border-[#323642]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -889,6 +1088,11 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                  {parsedMaterials.length > 0 && (
+                    <span className="px-2 py-0.5 bg-purple-500/10 text-purple-800 dark:text-purple-300 border border-purple-500/30 font-bold">
+                      Конспектов: {parsedMaterials.length}
+                    </span>
+                  )}
                   {parsedHomeworks.length > 0 && (
                     <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 font-bold">
                       ДЗ: {parsedHomeworks.length}
@@ -906,6 +1110,44 @@ export const BatchImportModal: React.FC<BatchImportModalProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Parsed Materials List */}
+              {parsedMaterials.length > 0 && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto border border-[#1B1B19]/15 dark:border-[#323642] p-2 bg-[#F8F7F4]/60 dark:bg-[#121316]/60">
+                  <div className="text-[10px] font-mono text-purple-900 dark:text-purple-300 uppercase font-bold px-1 mb-1 flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    Теория и конспекты ({parsedMaterials.length}):
+                  </div>
+                  {parsedMaterials.map((m, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2 bg-white dark:bg-[#1A1C24] border border-[#1B1B19]/10 dark:border-[#323642] flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 bg-purple-700 text-white font-bold shrink-0">
+                          {m.subject.toUpperCase()}
+                        </span>
+                        <span className="font-serif font-semibold text-[#1B1B19] dark:text-[#F3F3EE] truncate">
+                          {m.title}
+                        </span>
+                        <span className="text-[11px] font-mono text-[#1B1B19]/60 dark:text-gray-400 shrink-0">
+                          ({m.topic})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 font-mono text-[10px]">
+                        {m.keyFormulas && m.keyFormulas.length > 0 && (
+                          <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                            ∑ {m.keyFormulas.length} формул
+                          </span>
+                        )}
+                        <span className="text-[#1B1B19]/60 dark:text-gray-400">
+                          {m.readTimeMinutes} мин
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Parsed Homeworks List */}
               {parsedHomeworks.length > 0 && (

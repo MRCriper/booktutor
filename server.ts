@@ -264,6 +264,39 @@ ${contextSummary}
     }
   });
 
+  // Storage Backup & Cloud Sync endpoint
+  const backupFilePath = path.join(__dirname, 'latest_backup.json');
+
+  app.post('/api/storage/sync', (req, res) => {
+    try {
+      const backupData = req.body;
+      if (!backupData || typeof backupData !== 'object') {
+        return res.status(400).json({ error: 'Неверный формат данных бэкапа' });
+      }
+
+      fs.writeFileSync(backupFilePath, JSON.stringify(backupData, null, 2), 'utf8');
+      return res.json({
+        success: true,
+        message: 'Резервная копия успешно сохранена на сервере',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: `Ошибка записи: ${err.message}` });
+    }
+  });
+
+  app.get('/api/storage/sync', (_req, res) => {
+    try {
+      if (fs.existsSync(backupFilePath)) {
+        const raw = fs.readFileSync(backupFilePath, 'utf8');
+        return res.json(JSON.parse(raw));
+      }
+      return res.status(404).json({ error: 'Серверный бэкап еще не создавался' });
+    } catch (err: any) {
+      return res.status(500).json({ error: `Ошибка чтения: ${err.message}` });
+    }
+  });
+
   // Mount Vite or serve static dist
   if (!isProduction) {
     const vite = await createViteServer({
