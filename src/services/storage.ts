@@ -608,21 +608,32 @@ class StorageService {
       if (!data || typeof data !== 'object') {
         return { success: false, error: 'Неверный формат файла бэкапа' };
       }
-      if (Array.isArray(data.users)) this.setItem(STORAGE_KEYS.USERS, data.users);
-      if (Array.isArray(data.slots)) this.setItem(STORAGE_KEYS.SLOTS, data.slots);
-      if (Array.isArray(data.tasks)) this.setItem(STORAGE_KEYS.TASKS, data.tasks);
-      if (Array.isArray(data.homeworks)) this.setItem(STORAGE_KEYS.HOMEWORKS, data.homeworks);
-      if (Array.isArray(data.materials)) this.setItem(STORAGE_KEYS.MATERIALS, data.materials);
-      if (Array.isArray(data.variants)) this.setItem(STORAGE_KEYS.VARIANTS, data.variants);
-      if (Array.isArray(data.notes)) this.setItem(STORAGE_KEYS.INFORMAL_NOTES, data.notes);
-      if (Array.isArray(data.topicProgress)) this.setItem(STORAGE_KEYS.TOPIC_PROGRESS, data.topicProgress);
-      if (Array.isArray(data.examNumbers)) this.setItem(STORAGE_KEYS.EXAM_NUMBERS, data.examNumbers);
-      if (Array.isArray(data.chatMessages)) this.setItem(STORAGE_KEYS.CHAT_MESSAGES, data.chatMessages);
-      if (Array.isArray(data.xpRewards)) this.setItem(STORAGE_KEYS.XP_REWARDS, data.xpRewards);
+
+      const setRaw = (key: string, val: any) => {
+        try {
+          localStorage.setItem(key, JSON.stringify(val));
+        } catch (e) {
+          console.error('Error in setRaw', e);
+        }
+      };
+
+      if (Array.isArray(data.users)) setRaw(STORAGE_KEYS.USERS, data.users);
+      if (Array.isArray(data.slots)) setRaw(STORAGE_KEYS.SLOTS, data.slots);
+      if (Array.isArray(data.tasks)) setRaw(STORAGE_KEYS.TASKS, data.tasks);
+      if (Array.isArray(data.homeworks)) setRaw(STORAGE_KEYS.HOMEWORKS, data.homeworks);
+      if (Array.isArray(data.materials)) setRaw(STORAGE_KEYS.MATERIALS, data.materials);
+      if (Array.isArray(data.variants)) setRaw(STORAGE_KEYS.VARIANTS, data.variants);
+      if (Array.isArray(data.notes)) setRaw(STORAGE_KEYS.INFORMAL_NOTES, data.notes);
+      if (Array.isArray(data.topicProgress)) setRaw(STORAGE_KEYS.TOPIC_PROGRESS, data.topicProgress);
+      if (Array.isArray(data.examNumbers)) setRaw(STORAGE_KEYS.EXAM_NUMBERS, data.examNumbers);
+      if (Array.isArray(data.chatMessages)) setRaw(STORAGE_KEYS.CHAT_MESSAGES, data.chatMessages);
+      if (Array.isArray(data.xpRewards)) setRaw(STORAGE_KEYS.XP_REWARDS, data.xpRewards);
+
+      this.notify();
 
       return {
         success: true,
-        summary: `Успешно восстановлено: ДЗ (${data.homeworks?.length || 0}), материалов (${data.materials?.length || 0}), задач (${data.tasks?.length || 0}), слотов (${data.slots?.length || 0}), учеников (${data.users?.length || 0})`,
+        summary: `Успешно обновлено: ДЗ (${data.homeworks?.length || 0}), материалов (${data.materials?.length || 0}), задач (${data.tasks?.length || 0}), слотов (${data.slots?.length || 0}), учеников (${data.users?.length || 0})`,
       };
     } catch (e: any) {
       return { success: false, error: `Ошибка чтения JSON: ${e.message}` };

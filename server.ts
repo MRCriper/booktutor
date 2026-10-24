@@ -355,26 +355,52 @@ ${contextSummary}
       // Always update local backup as well
       fs.writeFileSync(backupFilePath, JSON.stringify(backupData, null, 2), 'utf8');
 
+      const now = new Date().toISOString();
       return res.json({
         success: true,
         provider: connStr ? 'neon_postgres' : 'local_file',
         message: connStr
           ? 'Данные успешно сохранены в облачную базу данных Neon Postgres на Vercel!'
           : 'Резервная копия успешно сохранена на сервере',
-        timestamp: new Date().toISOString(),
+        updatedAt: now,
+        timestamp: now,
       });
     } catch (err: any) {
       return res.status(500).json({ error: `Ошибка записи: ${err.message}` });
     }
   });
 
-  app.get('/api/storage/sync', async (_req, res) => {
+  app.get('/api/storage/sync', async (req, res) => {
     try {
+      const sinceParam = req.query.since as string | undefined;
       const connStr = getDbConnectionString();
+
       if (connStr) {
         try {
           const { neon } = await import('@neondatabase/serverless');
           const sql = neon(connStr);
+
+          if (sinceParam) {
+            const timeRows = await sql`
+              SELECT updated_at
+              FROM booktutor_storage
+              WHERE id = 'latest_snapshot'
+              LIMIT 1;
+            `;
+            if (timeRows && timeRows.length > 0) {
+              const dbTime = new Date(timeRows[0].updated_at).getTime();
+              const clientTime = new Date(sinceParam).getTime();
+              if (!isNaN(dbTime) && !isNaN(clientTime) && dbTime <= clientTime) {
+                return res.json({
+                  success: true,
+                  modified: false,
+                  provider: 'neon_postgres',
+                  updatedAt: timeRows[0].updated_at,
+                });
+              }
+            }
+          }
+
           const rows = await sql`
             SELECT payload, updated_at
             FROM booktutor_storage
@@ -384,6 +410,7 @@ ${contextSummary}
           if (rows && rows.length > 0) {
             return res.json({
               success: true,
+              modified: true,
               data: rows[0].payload,
               updatedAt: rows[0].updated_at,
               provider: 'neon_postgres',
@@ -395,10 +422,27 @@ ${contextSummary}
       }
 
       if (fs.existsSync(backupFilePath)) {
+        const stats = fs.statSync(backupFilePath);
+        const fileTime = stats.mtime.getTime();
+
+        if (sinceParam) {
+          const clientTime = new Date(sinceParam).getTime();
+          if (!isNaN(clientTime) && fileTime <= clientTime) {
+            return res.json({
+              success: true,
+              modified: false,
+              provider: 'local_file',
+              updatedAt: stats.mtime.toISOString(),
+            });
+          }
+        }
+
         const raw = fs.readFileSync(backupFilePath, 'utf8');
         return res.json({
           success: true,
+          modified: true,
           data: JSON.parse(raw),
+          updatedAt: stats.mtime.toISOString(),
           provider: 'local_file',
         });
       }

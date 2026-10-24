@@ -19,6 +19,7 @@ import { XPRewardsStore } from './components/student/XPRewardsStore';
 import { ScientificCalculator } from './components/common/ScientificCalculator';
 import { StudentOnboardingModal } from './components/student/StudentOnboardingModal';
 import { DatabaseSyncModal } from './components/common/DatabaseSyncModal';
+import { cloudSync } from './services/cloudSync';
 
 export default function App() {
   const [, setTick] = useState(0);
@@ -61,8 +62,9 @@ export default function App() {
   const [isCalcOpen, setIsCalcOpen] = useState(false);
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
 
-  // Subscribe to storage changes
+  // Subscribe to storage changes & start cloud auto-sync
   useEffect(() => {
+    cloudSync.init();
     const unsubscribe = storage.subscribe(() => {
       setCurrentUser(storage.getAuthSession());
       setTick((t) => t + 1);

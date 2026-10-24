@@ -23,10 +23,14 @@ import {
   Scale,
   Sliders,
   Database,
+  Cloud,
+  CloudOff,
+  RefreshCw,
 } from 'lucide-react';
 import { User } from '../../types';
 import { UserAvatar } from './UserAvatar';
 import { StudentGamificationState } from '../../utils/gamification';
+import { cloudSync, SyncInfo } from '../../services/cloudSync';
 
 interface NavbarProps {
   currentUser: User;
@@ -62,9 +66,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+  const [syncInfo, setSyncInfo] = useState<SyncInfo>(() => cloudSync.getInfo());
   const toolsMenuRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const isTutor = currentUser.role === 'tutor';
+
+  useEffect(() => {
+    return cloudSync.subscribe(setSyncInfo);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -162,6 +171,42 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
           )}
+
+          {/* Cloud Auto-Sync Indicator with Neon Postgres */}
+          <button
+            onClick={() => {
+              if (onOpenDatabase) onOpenDatabase();
+            }}
+            className={`hidden md:flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 border text-[11px] font-mono transition cursor-pointer select-none shadow-2xs ${
+              syncInfo.status === 'syncing'
+                ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                : syncInfo.status === 'error'
+                ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200'
+                : syncInfo.status === 'offline'
+                ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300'
+                : 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300/70 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100/70'
+            }`}
+            title={`Авто-синхронизация: ${syncInfo.message}. Нажмите для открытия настроек БД.`}
+          >
+            {syncInfo.status === 'syncing' ? (
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+            ) : syncInfo.status === 'error' ? (
+              <CloudOff className="w-3.5 h-3.5 text-rose-600" />
+            ) : syncInfo.status === 'offline' ? (
+              <CloudOff className="w-3.5 h-3.5 text-gray-500" />
+            ) : (
+              <Cloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            )}
+            <span className="font-bold">
+              {syncInfo.status === 'syncing'
+                ? 'Синхронизация...'
+                : syncInfo.status === 'error'
+                ? 'Офлайн'
+                : syncInfo.status === 'offline'
+                ? 'Офлайн'
+                : 'Neon БД'}
+            </span>
+          </button>
 
           {/* Tools Menu Button (Single button containing all tools: Calculator, Chat, AI, Python Sandbox, Theme) */}
           <div className="relative shrink-0" ref={toolsMenuRef}>

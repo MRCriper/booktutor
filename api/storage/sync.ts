@@ -75,11 +75,13 @@ export default async function handler(req: any, res: any) {
           updated_at = NOW();
       `;
 
+      const now = new Date().toISOString();
       return res.status(200).json({
         success: true,
         provider: 'neon_postgres',
         message: 'Данные успешно сохранены в облачную базу данных Neon Postgres на Vercel!',
-        timestamp: new Date().toISOString(),
+        updatedAt: now,
+        timestamp: now,
       });
     } catch (err: any) {
       console.error('Neon save error:', err);
@@ -95,6 +97,35 @@ export default async function handler(req: any, res: any) {
     try {
       await initDb();
 
+      const sinceParam = req.query?.since;
+
+      // 1. If 'since' is provided, perform an ultra-lightweight check of updated_at only!
+      if (sinceParam) {
+        const timeRows = await sql`
+          SELECT updated_at
+          FROM booktutor_storage
+          WHERE id = 'latest_snapshot'
+          LIMIT 1;
+        `;
+
+        if (timeRows && timeRows.length > 0) {
+          const dbTime = new Date(timeRows[0].updated_at).getTime();
+          const clientTime = new Date(sinceParam).getTime();
+
+          if (!isNaN(dbTime) && !isNaN(clientTime) && dbTime <= clientTime) {
+            // Nothing changed in cloud DB since client's last sync!
+            // Zero payload bytes transmitted, zero heavy JSON parsing.
+            return res.status(200).json({
+              success: true,
+              modified: false,
+              provider: 'neon_postgres',
+              updatedAt: timeRows[0].updated_at,
+            });
+          }
+        }
+      }
+
+      // 2. Fetch full snapshot if modified or no 'since' parameter
       const rows = await sql`
         SELECT payload, updated_at
         FROM booktutor_storage
@@ -105,6 +136,7 @@ export default async function handler(req: any, res: any) {
       if (rows && rows.length > 0) {
         return res.status(200).json({
           success: true,
+          modified: true,
           provider: 'neon_postgres',
           updatedAt: rows[0].updated_at,
           data: rows[0].payload,

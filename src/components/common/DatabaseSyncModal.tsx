@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { storage } from '../../services/storage';
+import { cloudSync } from '../../services/cloudSync';
 
 interface DatabaseSyncModalProps {
   isOpen: boolean;
@@ -185,26 +186,16 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
     setSyncMessage(null);
 
     try {
-      const backupData = storage.exportFullBackup();
-      const res = await fetch('/api/storage/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: backupData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setSyncMessage(`✓ Данные успешно сохранены в ${data.provider === 'neon_postgres' ? 'облачную базу Neon Postgres' : 'сервер'} (${new Date().toLocaleTimeString('ru-RU')})`);
+      const ok = await cloudSync.forcePush();
+      if (ok) {
+        setSyncMessage(`✓ Данные успешно сохранены в Neon Postgres (${new Date().toLocaleTimeString('ru-RU')})`);
         checkDbStatus();
         confetti({ particleCount: 30, spread: 50 });
       } else {
-        const errJson = await res.json().catch(() => null);
-        setSyncMessage(
-          errJson?.message || '⚠️ Ошибка синхронизации. Проверьте статус базы во вкладке «Подключение БД».'
-        );
+        setSyncMessage('⚠️ Не удалось сохранить в базу. Проверьте подключение к Vercel/Neon.');
       }
     } catch {
-      setSyncMessage('⚠️ Не удалось отправить запрос на сервер. Сделайте повторный деплой (Redeploy) на Vercel, чтобы активировать серверные функции.');
+      setSyncMessage('⚠️ Ошибка сети при отправке данных в базу.');
     } finally {
       setIsSyncing(false);
     }
@@ -215,28 +206,17 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
     setSyncMessage(null);
 
     try {
-      const res = await fetch('/api/storage/sync');
-      if (res.ok) {
-        const result = await res.json();
-        const payload = result.data;
-        if (payload) {
-          const importRes = storage.importFullBackup(JSON.stringify(payload));
-          if (importRes.success) {
-            setSyncMessage(`✓ Данные успешно загружены из ${result.provider === 'neon_postgres' ? 'Neon Postgres' : 'сервера'} в ваш браузер!`);
-            refreshStats();
-            onDataRestored?.();
-            confetti({ particleCount: 50, spread: 60 });
-          } else {
-            setSyncMessage(`⚠️ Ошибка распаковки данных: ${importRes.error}`);
-          }
-        } else {
-          setSyncMessage('⚠️ В базе данных еще нет сохраненных записей. Нажмите «Отправить в базу», чтобы инициализировать.');
-        }
+      const ok = await cloudSync.forcePull();
+      if (ok) {
+        setSyncMessage(`✓ Свежие данные успешно загружены из Neon Postgres!`);
+        refreshStats();
+        onDataRestored?.();
+        confetti({ particleCount: 50, spread: 60 });
       } else {
-        setSyncMessage('⚠️ Не удалось загрузить данные из базы. Убедитесь, что база данных инициализирована.');
+        setSyncMessage('ℹ️ Данные в вашем браузере уже самые актуальные (новых изменений в базе нет).');
       }
     } catch (e: any) {
-      setSyncMessage(`⚠️ Ошибка связи с сервером: ${e.message}`);
+      setSyncMessage(`⚠️ Ошибка связи с базой: ${e.message}`);
     } finally {
       setIsPulling(false);
     }
@@ -457,6 +437,21 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
                     <Download className={`w-3.5 h-3.5 ${isPulling ? 'animate-bounce' : ''}`} />
                     {isPulling ? 'Загрузка из Neon...' : 'Загрузить из базы (Pull)'}
                   </button>
+                </div>
+
+                {/* Auto-Sync Explanation Card */}
+                <div className="p-3 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 text-blue-950 dark:text-blue-200 text-xs flex items-start gap-2.5 font-sans">
+                  <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                    ⚡
+                  </div>
+                  <div className="space-y-0.5 leading-relaxed">
+                    <span className="font-bold block font-mono text-[11px]">
+                      Умная авто-синхронизация активна:
+                    </span>
+                    <p className="text-[11px] text-blue-900/80 dark:text-blue-300/80">
+                      Вам больше не нужно нажимать кнопки вручную: при любых действиях (выдача ДЗ, оценка с баллами, отправка фото тетрадей учеником, добавление конспекта) изменения автоматически отправляются в Neon Postgres с задержкой 1.8 с (debounce). Все другие ученики и преподаватель получают обновления в фоне при открытии страницы или переключении вкладки!
+                    </p>
+                  </div>
                 </div>
 
                 {syncMessage && (
