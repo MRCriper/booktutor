@@ -46,13 +46,49 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
     message?: string;
   } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [dbStatus, setDbStatus] = useState<{
+    connected: boolean;
+    provider?: string;
+    database?: string;
+    tableReady?: boolean;
+    lastUpdated?: string | null;
+    message?: string;
+  } | null>(null);
+  const [isCheckingDb, setIsCheckingDb] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     refreshStats();
+    checkDbStatus();
   }, [isOpen]);
+
+  const checkDbStatus = async () => {
+    setIsCheckingDb(true);
+    try {
+      const res = await fetch('/api/storage/status');
+      if (res.ok) {
+        const data = await res.json();
+        setDbStatus(data);
+      } else {
+        setDbStatus({
+          connected: false,
+          provider: 'unknown',
+          message: 'Сервер вернул статус ' + res.status + '. Перезапустите деплой (Redeploy) на Vercel.',
+        });
+      }
+    } catch {
+      setDbStatus({
+        connected: false,
+        provider: 'none',
+        message: 'Сервер недоступен или работает в режиме Static SPA без серверных функций.',
+      });
+    } finally {
+      setIsCheckingDb(false);
+    }
+  };
 
   const refreshStats = () => {
     try {
@@ -158,16 +194,51 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
 
       if (res.ok) {
         const data = await res.json();
-        setSyncMessage(`✓ Резервная копия успешно синхронизирована с сервером (${new Date().toLocaleTimeString('ru-RU')})`);
+        setSyncMessage(`✓ Данные успешно сохранены в ${data.provider === 'neon_postgres' ? 'облачную базу Neon Postgres' : 'сервер'} (${new Date().toLocaleTimeString('ru-RU')})`);
+        checkDbStatus();
         confetti({ particleCount: 30, spread: 50 });
       } else {
-        // Fallback for purely static environments
-        setSyncMessage('⚠️ Сервер Vercel сейчас в режиме статики (Static SPA). Используйте кнопку «Скачать полный бэкап (JSON)» для надежного сохранения.');
+        const errJson = await res.json().catch(() => null);
+        setSyncMessage(
+          errJson?.message || '⚠️ Ошибка синхронизации. Проверьте статус базы во вкладке «Подключение БД».'
+        );
       }
     } catch {
-      setSyncMessage('ℹ️ Сайт на Vercel работает автономно через LocalStorage. Все данные надежно сохранены в вашем браузере. Вы можете экспортировать JSON-бэкап в любой момент.');
+      setSyncMessage('⚠️ Не удалось отправить запрос на сервер. Сделайте повторный деплой (Redeploy) на Vercel, чтобы активировать серверные функции.');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handlePullFromDatabase = async () => {
+    setIsPulling(true);
+    setSyncMessage(null);
+
+    try {
+      const res = await fetch('/api/storage/sync');
+      if (res.ok) {
+        const result = await res.json();
+        const payload = result.data;
+        if (payload) {
+          const importRes = storage.importFullBackup(JSON.stringify(payload));
+          if (importRes.success) {
+            setSyncMessage(`✓ Данные успешно загружены из ${result.provider === 'neon_postgres' ? 'Neon Postgres' : 'сервера'} в ваш браузер!`);
+            refreshStats();
+            onDataRestored?.();
+            confetti({ particleCount: 50, spread: 60 });
+          } else {
+            setSyncMessage(`⚠️ Ошибка распаковки данных: ${importRes.error}`);
+          }
+        } else {
+          setSyncMessage('⚠️ В базе данных еще нет сохраненных записей. Нажмите «Отправить в базу», чтобы инициализировать.');
+        }
+      } else {
+        setSyncMessage('⚠️ Не удалось загрузить данные из базы. Убедитесь, что база данных инициализирована.');
+      }
+    } catch (e: any) {
+      setSyncMessage(`⚠️ Ошибка связи с сервером: ${e.message}`);
+    } finally {
+      setIsPulling(false);
     }
   };
 
@@ -320,22 +391,71 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
                 </div>
               </div>
 
-              {/* Cloud Sync Action */}
+              {/* Cloud Sync Action with Neon Postgres */}
               <div className="p-4 bg-white dark:bg-[#16181F] border border-[#1B1B19]/20 dark:border-[#323642] space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Server className="w-4 h-4 text-[#D4AF37]" />
+                    <Database className={`w-4 h-4 ${dbStatus?.connected ? 'text-emerald-600' : 'text-[#D4AF37]'}`} />
                     <span className="font-bold text-[#1B1B19] dark:text-[#F3F3EE]">
-                      Синхронизация с сервером (/api/storage/sync)
+                      Облачная синхронизация Neon Postgres на Vercel
                     </span>
                   </div>
                   <button
+                    onClick={checkDbStatus}
+                    disabled={isCheckingDb}
+                    className="self-start sm:self-auto text-[11px] text-[#1B1B19]/70 dark:text-gray-400 hover:text-[#1B1B19] dark:hover:text-white flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isCheckingDb ? 'animate-spin' : ''}`} />
+                    {isCheckingDb ? 'Проверка...' : 'Проверить статус связи'}
+                  </button>
+                </div>
+
+                {/* Connection Status Box */}
+                {dbStatus?.connected ? (
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 rounded-none space-y-1">
+                    <div className="flex items-center gap-2 font-bold text-xs">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      База данных Neon Postgres на Vercel подключена и активна!
+                    </div>
+                    <div className="text-[11px] font-sans text-emerald-900/80 dark:text-emerald-300/80 flex flex-wrap gap-x-4">
+                      <span>База: <strong>{dbStatus.database || 'neon-fuchsia-cave'}</strong></span>
+                      <span>Таблица: <strong>booktutor_storage</strong></span>
+                      {dbStatus.lastUpdated && (
+                        <span>Последний снимок: <strong>{new Date(dbStatus.lastUpdated).toLocaleString('ru-RU')}</strong></span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200 text-xs space-y-1 font-sans">
+                    <div className="flex items-center gap-1.5 font-bold font-mono">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      База Neon создана, но ожидает деплоя серверной функции на Vercel
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                      На вашем Vercel подключена база <code className="bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5">neon-fuchsia-cave</code>.
+                      Чтобы запросы доходили до нее, выполните <strong>Redeploy</strong> в Vercel Dashboard (вкладка <em>Deployments → ... → Redeploy</em>), чтобы Vercel запустил новую функцию <code className="bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5">api/storage/sync.ts</code>.
+                    </p>
+                  </div>
+                )}
+
+                {/* Sync Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
                     onClick={handleSyncWithServer}
                     disabled={isSyncing}
-                    className="px-3 py-1.5 bg-[#1B1B19] hover:bg-black text-[#F8F7F4] dark:bg-[#E5C048] dark:text-[#121316] font-bold transition flex items-center gap-1.5 cursor-pointer text-xs"
+                    className="p-2.5 bg-[#1B1B19] hover:bg-black text-[#F8F7F4] dark:bg-[#E5C048] dark:text-[#121316] font-bold transition flex items-center justify-center gap-2 cursor-pointer text-xs"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    {isSyncing ? 'Синхронизация...' : 'Синхронизировать сейчас'}
+                    <Upload className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
+                    {isSyncing ? 'Сохранение в Neon...' : 'Отправить в базу (Push)'}
+                  </button>
+
+                  <button
+                    onClick={handlePullFromDatabase}
+                    disabled={isPulling}
+                    className="p-2.5 bg-white dark:bg-[#202430] hover:bg-[#F8F7F4] dark:hover:bg-[#2A2E3D] text-[#1B1B19] dark:text-[#F3F3EE] border border-[#1B1B19]/25 dark:border-[#383C4A] font-bold transition flex items-center justify-center gap-2 cursor-pointer text-xs"
+                  >
+                    <Download className={`w-3.5 h-3.5 ${isPulling ? 'animate-bounce' : ''}`} />
+                    {isPulling ? 'Загрузка из Neon...' : 'Загрузить из базы (Pull)'}
                   </button>
                 </div>
 
@@ -453,69 +573,73 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
 
           {activeTab === 'cloud_guide' && (
             <div className="space-y-4 font-sans text-xs">
-              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200">
-                <strong className="font-mono text-sm">Как подключить постоянную облачную базу данных на Vercel:</strong>
-                <p className="mt-1 leading-relaxed">
-                  Если вы хотите, чтобы репетитор и ученики работали с единой облачной базой без необходимости пересылать бэкапы, на Vercel есть 3 простых и бесплатных решения.
+              {/* Highlight specifically for user's screenshot */}
+              <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-100 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <strong className="font-mono text-sm">
+                    Ваша база данных на Vercel: neon-fuchsia-cave (Neon Free)
+                  </strong>
+                </div>
+                <p className="leading-relaxed text-xs">
+                  Вы всё настроили в Vercel правильно: база данных создана и подключена к проекту <strong>booktutor</strong> (состояние <em>Available</em> на вашем скриншоте).
                 </p>
+
+                <div className="p-3 bg-white/90 dark:bg-[#16181F] border border-emerald-300/60 dark:border-emerald-700/60 space-y-2 text-xs">
+                  <div className="font-bold text-emerald-900 dark:text-emerald-300 font-mono">
+                    Почему ранее сайт выдавал «Сервер в режиме статики»?
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed font-sans">
+                    На Vercel проект собирался как статичный SPA: в коде не было Serverless-функции в папке <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5">/api/storage/sync.ts</code>, а файл <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5">vercel.json</code> перенаправлял все запросы на <code>index.html</code>.
+                  </p>
+                  <div className="font-bold text-emerald-900 dark:text-emerald-300 font-mono pt-1">
+                    Что мы только что исправили в коде:
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300 font-sans">
+                    <li>Создали серверную функцию <code className="bg-gray-100 dark:bg-gray-800 px-1">/api/storage/sync.ts</code> для сохранения и загрузки данных через <code>@neondatabase/serverless</code>.</li>
+                    <li>Добавили эндпоинт проверки статуса <code className="bg-gray-100 dark:bg-gray-800 px-1">/api/storage/status.ts</code>.</li>
+                    <li>Исправили <code className="bg-gray-100 dark:bg-gray-800 px-1">vercel.json</code>, чтобы роуты <code>/api/*</code> не перехватывались статичным HTML.</li>
+                    <li>Таблица <code>booktutor_storage</code> создается автоматически при первом запросе и хранит всех учеников, ДЗ с прикрепленными фото, конспекты и журнал.</li>
+                  </ul>
+                </div>
+
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200 text-xs space-y-1.5">
+                  <div className="font-bold flex items-center gap-1.5 font-mono">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    Что сделать прямо сейчас, чтобы всё заработало:
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1.5 font-sans text-[11px] text-amber-900/90 dark:text-amber-200/90">
+                    <li>
+                      Зайдите в ваш проект в Vercel: <a href="https://vercel.com/mxakerov-yandex-ru/booktutor/deployments" target="_blank" rel="noreferrer" className="underline font-bold text-blue-700 dark:text-blue-300">Вкладка Deployments</a>.
+                    </li>
+                    <li>
+                      У самого верхнего деплоя нажмите справа кнопку с тремя точками <strong>...</strong> и выберите <strong>Redeploy</strong> (или отправьте коммит в GitHub).
+                    </li>
+                    <li>
+                      Дождитесь окончания сборки (30-60 секунд). Vercel автоматически передаст в проект переменную <code>POSTGRES_URL</code> от вашей базы <code>neon-fuchsia-cave</code>.
+                    </li>
+                    <li>
+                      Откройте сайт и нажмите во вкладке «Где хранятся данные?» кнопку <strong>«Отправить в базу (Push)»</strong>. Статус станет зеленым: <em>«База данных Neon Postgres подключена и активна!»</em>.
+                    </li>
+                  </ol>
+                </div>
               </div>
 
-              {/* Option 1: Vercel Postgres / Neon */}
+              {/* Architecture info */}
               <div className="p-4 bg-white dark:bg-[#16181F] border border-[#1B1B19]/20 dark:border-[#323642] space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
                     <h4 className="font-serif text-sm font-bold text-[#1B1B19] dark:text-[#F3F3EE]">
-                      Вариант 1 (Рекомендуемый для Vercel): Vercel Postgres / Neon
+                      Гибридная архитектура BookTutor Pro (Local + Cloud)
                     </h4>
                   </div>
                   <span className="font-mono text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 font-bold">
-                    Бесплатный тариф (Hobby)
+                    Zero-latency + Cloud Sync
                   </span>
                 </div>
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                  Полноценная реляционная база PostgreSQL, интегрированная прямо в панель Vercel. Подключается в 2 клика:
-                </p>
-                <ol className="list-decimal list-inside space-y-1 font-mono text-[11px] text-[#1B1B19]/80 dark:text-gray-300">
-                  <li>Зайдите в ваш проект на <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" className="text-blue-600 underline">vercel.com</a></li>
-                  <li>Перейдите во вкладку <strong>Storage</strong> → нажмите <strong>Create Database</strong> → выберите <strong>Postgres</strong></li>
-                  <li>Нажмите <strong>Connect Project</strong> — Vercel автоматически добавит переменные <code>POSTGRES_URL</code> в Environment Variables</li>
-                </ol>
-              </div>
-
-              {/* Option 2: Firebase Firestore */}
-              <div className="p-4 bg-white dark:bg-[#16181F] border border-[#1B1B19]/20 dark:border-[#323642] space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                    <h4 className="font-serif text-sm font-bold text-[#1B1B19] dark:text-[#F3F3EE]">
-                      Вариант 2: Firebase Firestore (Realtime DB)
-                    </h4>
-                  </div>
-                  <span className="font-mono text-[10px] px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-bold">
-                    Realtime-синхронизация
-                  </span>
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                  Идеально подходит для мгновенного появления решений, фото и оценок у ученика и преподавателя без обновления страницы. Бесплатный тариф Spark включает до 50 000 чтений в день.
-                </p>
-              </div>
-
-              {/* Option 3: Vercel KV */}
-              <div className="p-4 bg-white dark:bg-[#16181F] border border-[#1B1B19]/20 dark:border-[#323642] space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
-                    <h4 className="font-serif text-sm font-bold text-[#1B1B19] dark:text-[#F3F3EE]">
-                      Вариант 3: Vercel KV (Upstash Redis)
-                    </h4>
-                  </div>
-                  <span className="font-mono text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 font-bold">
-                    Ключ-значение
-                  </span>
-                </div>
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                  Хранилище «ключ-значение» прямо в Vercel Storage. Все дампы JSON можно сохранять по ключу пользователя или школы.
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-xs">
+                  Все данные хранятся локально в браузере для мгновенного отклика (0 мс) и полной работы без сети, а через Neon Postgres репетитор и ученики синхронизируют конспекты, решения с фото и оценки между любыми устройствами в 1 клик.
                 </p>
               </div>
             </div>

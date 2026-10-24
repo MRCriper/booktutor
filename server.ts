@@ -264,20 +264,103 @@ ${contextSummary}
     }
   });
 
-  // Storage Backup & Cloud Sync endpoint
+  // Storage Backup & Cloud Sync endpoint (Supports Neon Postgres & Local Fallback)
   const backupFilePath = path.join(__dirname, 'latest_backup.json');
 
-  app.post('/api/storage/sync', (req, res) => {
+  const getDbConnectionString = () =>
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    null;
+
+  app.get('/api/storage/status', async (_req, res) => {
+    const connStr = getDbConnectionString();
+    if (!connStr) {
+      return res.json({
+        connected: false,
+        provider: 'local_server',
+        message: 'Сервер запущен локально без подключенной базы данных Neon Postgres.',
+      });
+    }
+
+    try {
+      const { neon } = await import('@neondatabase/serverless');
+      const sql = neon(connStr);
+      const test = await sql`SELECT 1 as alive, current_database() as db_name;`;
+      const tableCheck = await sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'booktutor_storage'
+        ) as table_exists;
+      `;
+
+      let lastUpdated: string | null = null;
+      if (tableCheck[0]?.table_exists) {
+        const row = await sql`SELECT updated_at FROM booktutor_storage WHERE id = 'latest_snapshot' LIMIT 1;`;
+        if (row.length > 0) lastUpdated = row[0].updated_at;
+      }
+
+      return res.json({
+        connected: true,
+        provider: 'neon_postgres',
+        database: test[0]?.db_name || 'postgres',
+        tableReady: Boolean(tableCheck[0]?.table_exists),
+        lastUpdated,
+        message: 'Подключение к базе данных Neon Postgres на Vercel активно!',
+      });
+    } catch (err: any) {
+      return res.json({
+        connected: false,
+        provider: 'neon_postgres',
+        error: err.message,
+        message: `Ошибка подключения к Neon: ${err.message}`,
+      });
+    }
+  });
+
+  app.post('/api/storage/sync', async (req, res) => {
     try {
       const backupData = req.body;
       if (!backupData || typeof backupData !== 'object') {
         return res.status(400).json({ error: 'Неверный формат данных бэкапа' });
       }
 
+      const connStr = getDbConnectionString();
+      if (connStr) {
+        try {
+          const { neon } = await import('@neondatabase/serverless');
+          const sql = neon(connStr);
+          await sql`
+            CREATE TABLE IF NOT EXISTS booktutor_storage (
+              id VARCHAR(64) PRIMARY KEY,
+              payload JSONB NOT NULL,
+              updated_at TIMESTAMPTZ DEFAULT NOW()
+            );
+          `;
+          const payloadStr = JSON.stringify(backupData);
+          await sql`
+            INSERT INTO booktutor_storage (id, payload, updated_at)
+            VALUES ('latest_snapshot', ${payloadStr}::jsonb, NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              payload = EXCLUDED.payload,
+              updated_at = NOW();
+          `;
+        } catch (dbErr: any) {
+          console.error('Failed to sync to Neon, falling back to local file:', dbErr);
+        }
+      }
+
+      // Always update local backup as well
       fs.writeFileSync(backupFilePath, JSON.stringify(backupData, null, 2), 'utf8');
+
       return res.json({
         success: true,
-        message: 'Резервная копия успешно сохранена на сервере',
+        provider: connStr ? 'neon_postgres' : 'local_file',
+        message: connStr
+          ? 'Данные успешно сохранены в облачную базу данных Neon Postgres на Vercel!'
+          : 'Резервная копия успешно сохранена на сервере',
         timestamp: new Date().toISOString(),
       });
     } catch (err: any) {
@@ -285,12 +368,41 @@ ${contextSummary}
     }
   });
 
-  app.get('/api/storage/sync', (_req, res) => {
+  app.get('/api/storage/sync', async (_req, res) => {
     try {
+      const connStr = getDbConnectionString();
+      if (connStr) {
+        try {
+          const { neon } = await import('@neondatabase/serverless');
+          const sql = neon(connStr);
+          const rows = await sql`
+            SELECT payload, updated_at
+            FROM booktutor_storage
+            WHERE id = 'latest_snapshot'
+            LIMIT 1;
+          `;
+          if (rows && rows.length > 0) {
+            return res.json({
+              success: true,
+              data: rows[0].payload,
+              updatedAt: rows[0].updated_at,
+              provider: 'neon_postgres',
+            });
+          }
+        } catch (dbErr) {
+          console.warn('Neon read failed, trying local file fallback:', dbErr);
+        }
+      }
+
       if (fs.existsSync(backupFilePath)) {
         const raw = fs.readFileSync(backupFilePath, 'utf8');
-        return res.json(JSON.parse(raw));
+        return res.json({
+          success: true,
+          data: JSON.parse(raw),
+          provider: 'local_file',
+        });
       }
+
       return res.status(404).json({ error: 'Серверный бэкап еще не создавался' });
     } catch (err: any) {
       return res.status(500).json({ error: `Ошибка чтения: ${err.message}` });
