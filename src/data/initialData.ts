@@ -20,36 +20,6 @@ export const INITIAL_USERS: User[] = [
     role: 'tutor',
     notes: 'Преподаватель. Эксперт ЕГЭ/ОГЭ по математике, физике, информатике и русскому языку. Стаж более 10 лет.',
   },
-  {
-    id: 'student-1',
-    name: 'Алексей Смирнов',
-    email: 'alexey.smirnov@mail.ru',
-    password: 'student',
-    role: 'student',
-    grade: '11 класс',
-    targetExam: 'ЕГЭ',
-    examKind: 'ege',
-    targetScore: 92,
-    parentName: 'Смирнова Елена Викторовна',
-    parentPhone: '+7 (916) 234-56-78',
-    notes: 'Мотивированный ученик, нацелен на МФТИ / ВШЭ (ФКН). Отлично решает параметры, шлифуем стереометрию.',
-    subjects: ['math', 'cs', 'physics'],
-  },
-  {
-    id: 'student-2',
-    name: 'Екатерина Васильева',
-    email: 'ekaterina.v@yandex.ru',
-    password: 'student',
-    role: 'student',
-    grade: '10 класс',
-    targetExam: 'ЕГЭ',
-    examKind: 'ege',
-    targetScore: 85,
-    parentName: 'Васильев Игорь Сергеевич',
-    parentPhone: '+7 (925) 345-67-89',
-    notes: 'Готовится к ЕГЭ по физике и профильной математике.',
-    subjects: ['physics', 'math'],
-  },
 ];
 
 export const INITIAL_SLOTS: TimeSlot[] = [
@@ -77,8 +47,6 @@ export const INITIAL_SLOTS: TimeSlot[] = [
     topic: 'Параметры в ЕГЭ: графический метод и ромб',
     meetingLink: 'https://telemost.yandex.ru/j/84920193857102',
     status: 'available',
-    homeworkId: 'hw-1',
-    homeworkTitle: 'Домашняя работа №1: Параметры и тригонометрия',
     materialIds: ['mat-math-1'],
     materialTitles: ['Конспект: Тригонометрические формулы и методы решения параметров'],
   },
@@ -755,93 +723,7 @@ export const SAMPLE_NOTEBOOK_PHOTO_2 = `data:image/svg+xml;utf8,${encodeURICompo
   </g>
 </svg>`)}`;
 
-export const INITIAL_HOMEWORKS: Homework[] = [
-  {
-    id: 'hw-1',
-    studentId: 'student-1',
-    subject: 'math',
-    title: 'Домашняя работа №1: Параметры и тригонометрия',
-    assignedDate: '2026-10-15',
-    dueDate: '2026-10-22',
-    status: 'submitted',
-    submittedAt: '2026-10-20T19:45:00Z',
-    studentComment: 'Решил задачи №18 и №14 в тетради, отсканировал и прикрепил оба листа с чертежами. В №18 построил квадрат и окружность, в №14 использовал векторно-координатный метод. Посмотрите, пожалуйста, оформление для эксперта ЕГЭ.',
-    photos: [SAMPLE_NOTEBOOK_PHOTO_1, SAMPLE_NOTEBOOK_PHOTO_2],
-    tasks: [
-      {
-        taskId: 'task-math-1',
-        studentAnswer: '[-2√2; 2√2]',
-        isCorrect: true,
-        score: 4,
-        maxScore: 4,
-        tutorComment: '',
-      },
-      {
-        taskId: 'task-math-2',
-        studentAnswer: '2√21/7',
-        isCorrect: true,
-        score: 3,
-        maxScore: 3,
-        tutorComment: '',
-      },
-      {
-        taskId: 'task-math-3',
-        studentAnswer: 'а) x = pi/6 + 2pik, 5pi/6 + 2pik; б) 13pi/6',
-        isCorrect: true,
-        score: 2,
-        maxScore: 2,
-        tutorComment: '',
-      },
-    ],
-  },
-  {
-    id: 'hw-2',
-    studentId: 'student-1',
-    subject: 'cs',
-    title: 'КЕГЭ №24-27: Алгоритмы обработки строк и файлов',
-    assignedDate: '2026-10-18',
-    dueDate: '2026-10-25',
-    status: 'assigned',
-    tasks: [
-      {
-        taskId: 'task-cs-1',
-        studentAnswer: '',
-        maxScore: 1,
-      },
-      {
-        taskId: 'task-cs-2',
-        studentAnswer: '',
-        maxScore: 1,
-      },
-    ],
-  },
-  {
-    id: 'hw-3',
-    studentId: 'student-2',
-    subject: 'physics',
-    title: 'ДЗ №2: Электромагнитная индукция и законы Фарадея',
-    assignedDate: '2026-10-14',
-    dueDate: '2026-10-19',
-    status: 'graded',
-    submittedAt: '2026-10-18T16:20:00Z',
-    grade: 5,
-    mark: 5,
-    earnedPoints: 5,
-    totalPoints: 5,
-    studentComment: 'Задачи решил, формулу Томсона применил для колебательного контура.',
-    tutorFeedback: 'Отличная работа! Дано записано аккуратно, перевод в СИ выполнен без ошибок, все законы названы верно. Оценка «5» (Отлично).',
-    tasks: [
-      {
-        taskId: 'task-math-1',
-        studentAnswer: 'Ответ сошёлся',
-        score: 1,
-        maxScore: 1,
-        isCorrect: true,
-        tutorComment: 'Всё верно!',
-      },
-    ],
-  },
-];
+export const INITIAL_HOMEWORKS: Homework[] = [];
 
 export const INITIAL_TOPIC_PROGRESS: ExamTopicProgress[] = [
   { topicId: 'top-1', topicName: 'Уравнения с параметрами (№18)', subject: 'math', masteryPercentage: 0, tasksSolved: 0, tasksTotal: 18 },

@@ -586,8 +586,23 @@ export const TutorDashboard: React.FC<TutorDashboardProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {students.map((st) => {
+          {students.length === 0 ? (
+            <div className="p-8 text-center bg-white border border-dashed border-[#1B1B19]/30 space-y-3 font-mono">
+              <Users className="w-8 h-8 text-[#D4AF37] mx-auto" />
+              <div className="font-serif text-lg font-bold text-[#1B1B19]">Список учеников пуст</div>
+              <p className="font-sans text-xs text-[#1B1B19]/60 max-w-md mx-auto">
+                Все тестовые аккаунты удалены. Нажмите «Новый ученик», чтобы добавить реального ученика в систему.
+              </p>
+              <button
+                onClick={() => setShowAddStudentModal(true)}
+                className="text-xs font-bold uppercase tracking-wider px-4 py-2 bg-[#1B1B19] hover:bg-black text-[#F8F7F4] transition inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-[#D4AF37]" /> Добавить первого ученика
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {students.map((st) => {
               const isCopied = copiedId === st.id;
               const stStats = calculateStudentGamification(
                 st,
@@ -784,7 +799,8 @@ export const TutorDashboard: React.FC<TutorDashboardProps> = ({
                 </motion.div>
               );
             })}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -17,6 +17,7 @@ import {
   FileCode,
   ShieldCheck,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { storage } from '../../services/storage';
@@ -452,6 +453,26 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({
                       Вам больше не нужно нажимать кнопки вручную: при любых действиях (выдача ДЗ, оценка с баллами, отправка фото тетрадей учеником, добавление конспекта) изменения автоматически отправляются в Neon Postgres с задержкой 1.8 с (debounce). Все другие ученики и преподаватель получают обновления в фоне при открытии страницы или переключении вкладки!
                     </p>
                   </div>
+                </div>
+
+                {/* Purge Mock Data Button */}
+                <div className="pt-2 border-t border-[#1B1B19]/10 dark:border-[#323642] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="text-[11px] text-[#1B1B19]/60 dark:text-gray-400 font-sans">
+                    Очистить базу от тестовых учеников и демо-ДЗ:
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const res = storage.purgeMockTestData();
+                      await cloudSync.forcePush();
+                      refreshStats();
+                      onDataRestored?.();
+                      setSyncMessage(`✓ Все тестовые данные удалены (${res.removedStudents} учеников, ${res.removedHomeworks} ДЗ) и база данных Neon обновлена!`);
+                    }}
+                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Очистить тестовые данные навсегда
+                  </button>
                 </div>
 
                 {syncMessage && (

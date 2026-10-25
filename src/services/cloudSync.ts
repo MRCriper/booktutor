@@ -225,8 +225,28 @@ class CloudSyncService {
       // New data available! Apply to LocalStorage seamlessly
       const payload = json.data;
       if (payload && typeof payload === 'object') {
+        let hadLegacyMockData = false;
+        if (Array.isArray(payload.users)) {
+          const originalLen = payload.users.length;
+          payload.users = payload.users.filter((u: any) => u.id !== 'student-1' && u.id !== 'student-2');
+          if (payload.users.length !== originalLen) hadLegacyMockData = true;
+        }
+        if (Array.isArray(payload.homeworks)) {
+          const originalHwLen = payload.homeworks.length;
+          payload.homeworks = payload.homeworks.filter(
+            (h: any) =>
+              h.id !== 'hw-1' &&
+              h.id !== 'hw-2' &&
+              h.id !== 'hw-3' &&
+              h.studentId !== 'student-1' &&
+              h.studentId !== 'student-2'
+          );
+          if (payload.homeworks.length !== originalHwLen) hadLegacyMockData = true;
+        }
+
         this.isApplyingRemoteUpdate = true;
         storage.importFullBackup(JSON.stringify(payload));
+        storage.purgeMockTestData();
         this.isApplyingRemoteUpdate = false;
 
         const serverTime = json.updatedAt || new Date().toISOString();
@@ -241,6 +261,14 @@ class CloudSyncService {
         this.lastSyncedAt = new Date();
         this.message = 'Данные синхронизированы с облаком';
         this.notify();
+
+        // If remote database still had legacy test data, overwrite with clean state
+        if (hadLegacyMockData) {
+          setTimeout(() => {
+            this.pushLocalChanges();
+          }, 300);
+        }
+
         return true;
       }
 

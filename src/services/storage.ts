@@ -53,6 +53,7 @@ class StorageService {
 
   constructor() {
     this.initDefaults();
+    this.purgeMockTestData();
   }
 
   public subscribe(listener: Listener): () => void {
@@ -90,7 +91,7 @@ class StorageService {
       this.setItem(STORAGE_KEYS.AUTH_USER_ID, INITIAL_USERS[0].id);
       this.setItem(STORAGE_KEYS.SLOTS, INITIAL_SLOTS);
       this.setItem(STORAGE_KEYS.TASKS, INITIAL_TASKS);
-      this.setItem(STORAGE_KEYS.HOMEWORKS, INITIAL_HOMEWORKS);
+      this.setItem(STORAGE_KEYS.HOMEWORKS, []);
       this.setItem(STORAGE_KEYS.MATERIALS, INITIAL_STUDY_MATERIALS);
       this.setItem(STORAGE_KEYS.TOPIC_PROGRESS, INITIAL_TOPIC_PROGRESS);
       this.setItem(STORAGE_KEYS.EXAM_NUMBERS, INITIAL_EXAM_NUMBERS);
@@ -138,8 +139,13 @@ class StorageService {
   // Users Management
   public getUsers(): User[] {
     const list = this.getItem<User[]>(STORAGE_KEYS.USERS, INITIAL_USERS);
-    if (!list || list.length <= 1) {
+    if (!list || list.length === 0) {
       return INITIAL_USERS;
+    }
+    // Ensure tutor is always present in users
+    if (!list.some((u) => u.role === 'tutor')) {
+      const tutor = INITIAL_USERS.find((u) => u.role === 'tutor');
+      if (tutor) return [tutor, ...list];
     }
     return list;
   }
@@ -428,11 +434,7 @@ class StorageService {
 
   // Homeworks
   public getHomeworks(): Homework[] {
-    const list = this.getItem<Homework[]>(STORAGE_KEYS.HOMEWORKS, INITIAL_HOMEWORKS);
-    if (!list || list.length === 0) {
-      return INITIAL_HOMEWORKS;
-    }
-    return list;
+    return this.getItem<Homework[]>(STORAGE_KEYS.HOMEWORKS, []);
   }
 
   public getHomeworksForStudent(studentId: string): Homework[] {
@@ -772,6 +774,64 @@ class StorageService {
     );
     this.setItem(STORAGE_KEYS.USERS, updatedUsers);
     return true;
+  }
+
+  // Purge legacy mock test data (student-1, student-2, hw-1, hw-2, hw-3)
+  public purgeMockTestData(): { removedStudents: number; removedHomeworks: number } {
+    if (typeof window === 'undefined') return { removedStudents: 0, removedHomeworks: 0 };
+
+    const users = this.getItem<User[]>(STORAGE_KEYS.USERS, []);
+    const studentsToRemove = users.filter((u) => u.id === 'student-1' || u.id === 'student-2');
+    const cleanedUsers = users.filter((u) => u.id !== 'student-1' && u.id !== 'student-2');
+    if (!cleanedUsers.some((u) => u.role === 'tutor')) {
+      cleanedUsers.unshift(INITIAL_USERS[0]);
+    }
+    this.setItem(STORAGE_KEYS.USERS, cleanedUsers);
+
+    const hws = this.getItem<Homework[]>(STORAGE_KEYS.HOMEWORKS, []);
+    const hwsToRemove = hws.filter(
+      (h) => h.id === 'hw-1' || h.id === 'hw-2' || h.id === 'hw-3' || h.studentId === 'student-1' || h.studentId === 'student-2'
+    );
+    const cleanedHws = hws.filter(
+      (h) => h.id !== 'hw-1' && h.id !== 'hw-2' && h.id !== 'hw-3' && h.studentId !== 'student-1' && h.studentId !== 'student-2'
+    );
+    this.setItem(STORAGE_KEYS.HOMEWORKS, cleanedHws);
+
+    // Clean slots
+    const slots = this.getItem<TimeSlot[]>(STORAGE_KEYS.SLOTS, []);
+    const cleanedSlots = slots.map((s) => {
+      let updated = { ...s };
+      if (updated.studentId === 'student-1' || updated.studentId === 'student-2') {
+        updated.isBooked = false;
+        updated.studentId = undefined;
+        updated.studentName = undefined;
+        updated.status = 'available';
+      }
+      if (updated.homeworkId === 'hw-1' || updated.homeworkId === 'hw-2' || updated.homeworkId === 'hw-3') {
+        updated.homeworkId = undefined;
+        updated.homeworkTitle = undefined;
+      }
+      return updated;
+    });
+    this.setItem(STORAGE_KEYS.SLOTS, cleanedSlots);
+
+    // Clean notes and submissions
+    const notes = this.getItem<InformalNote[]>(STORAGE_KEYS.INFORMAL_NOTES, []);
+    this.setItem(
+      STORAGE_KEYS.INFORMAL_NOTES,
+      notes.filter((n) => n.studentId !== 'student-1' && n.studentId !== 'student-2')
+    );
+
+    const subs = this.getItem<VariantSubmission[]>(STORAGE_KEYS.SUBMISSIONS, []);
+    this.setItem(
+      STORAGE_KEYS.SUBMISSIONS,
+      subs.filter((s) => s.studentId !== 'student-1' && s.studentId !== 'student-2')
+    );
+
+    return {
+      removedStudents: studentsToRemove.length,
+      removedHomeworks: hwsToRemove.length,
+    };
   }
 
   // Reset all data to clean defaults
